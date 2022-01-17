@@ -1,0 +1,25 @@
+---
+- role: Customer
+  name: Kevlar Musyoki
+  tel: "0791234578"
+- role: Customer
+  name: Bullet Proof
+  tel: "0791234321"
+- role: Customer
+  name: lil wayne
+  tel: "0932"
+- role: Customer
+  name: tyga
+  tel: "12354"
+- role: Customer
+  name: azzi nase
+  tel: "09874365"
+- role: Supplier
+  name: kimani
+  tel: "0978563412"
+- role: Supplier
+  name: judex01
+  tel: "0740044942"
+- role: Customer
+  name: leah kariuki
+  tel: "0589375427"

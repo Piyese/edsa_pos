@@ -1,0 +1,21 @@
+[]. change quantity from u32 to f32 in all instances
+[]. add error handling incase of overflow
+[]. deal with the theming problem
+[]. add more fonts
+[x]. manage the Config struct bools correctly
+[]. the Product struct in edsa_pos needs work
+[x]. stop logging of empty transactions
+[]. put loops in threads
+[x]. add timestamps to transactions
+[x]. add selectable labels for all approprite enums
+[x]. add a back button on the transaction page/cash
+[x]. add raw materialS to the State struct
+
+
+[]. display data on bar charts
+[]. serialize data into simple text files for email
+
+[x]. underline transaction details..cap T
+[x]. one line space between supplier and maize qnty/ buyer flower qnty
+[x]. align to one side total availables and the other side the add button
+[x]. reduce the text area box
