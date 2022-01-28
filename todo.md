@@ -1,0 +1,1 @@
+[]. correct the adding of duplicate raw materials to item list 

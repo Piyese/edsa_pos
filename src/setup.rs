@@ -1,7 +1,6 @@
 
-
 use edsa_pos::{sale::{
-    accounts::{TransactionIn, OutTransaction},
+    accounts::{TransactionIn, OutTransaction, DebtInt, DebtExt},
     people::{Employee, Person, Sex, Role}, 
     inventory::{FinishedProduct, DailyYield, Product, RawMaterial}}, 
     fetch_transaction_in_log, 
@@ -9,7 +8,7 @@ use edsa_pos::{sale::{
     fetch_employee_logs, 
     fetch_people_logs, 
     fetch_finished_product_log, 
-    fetch_daily_logs, fetch_raw_material_log
+    fetch_daily_logs, fetch_raw_material_log, fetch_ext_debt_holders, fetch_int_debt_holders
 };
 
 use serde::{Serialize, Deserialize};
@@ -42,15 +41,17 @@ pub struct TempVecs {
     b: Vec<Person>,
     c: Vec<TransactionIn>,
     d: Vec<OutTransaction>,
+    e: Vec<DebtExt>,
+    f: Vec<DebtInt>,
 }
 
 #[derive(Serialize,Deserialize)]
 pub struct Config {
-    //theme
+    // theme
     dark_mode: bool,
-    //main control
+    // main control
     main_active: bool,
-    //main
+    // main
     inv_win: bool,
     cash_win: bool,
     staff_win: bool,
@@ -96,6 +97,8 @@ pub struct Package {
     fin_prod: FinishedProduct,
     raw_mat: RawMaterial,
     daily_rec: Vec<DailyYield>,
+    ext_debt: Vec<DebtExt>,
+    int_debt: Vec<DebtInt>
 }
 
 impl Default for Package {
@@ -107,8 +110,10 @@ impl Default for Package {
         let fin_prod = fetch_finished_product_log().unwrap();
         let raw_mat = fetch_raw_material_log().unwrap();
         let daily_rec = fetch_daily_logs().unwrap();
+        let ext_debt = fetch_ext_debt_holders().unwrap();
+        let int_debt = fetch_int_debt_holders().unwrap();
 
-        Self { money_in, money_out, staff, sup_cus, fin_prod, raw_mat, daily_rec }
+        Self { money_in, money_out, staff, sup_cus, fin_prod, raw_mat, daily_rec, ext_debt, int_debt}
     }
 }
 #[allow(unused_variables)]
@@ -127,7 +132,8 @@ pub struct Editor {
 }
 impl Editor {
     pub fn new() -> Self {
-        Self { a:String::default(), 
+        Self { 
+            a:String::default(), 
             b:String::default(), 
             c:String::default(), 
             d:String::default(), 
@@ -344,6 +350,7 @@ impl State {
                                             trans.update(f);
     
                                             trans.settle_bill(paid);
+                                            if !trans.bill_settled {self.package.int_debt =  fetch_int_debt_holders().unwrap();}
                                             self.package.money_out.push(trans.to_owned());
                                             trans.balance_books(&mut self.package.raw_mat);
                                             trans.log();
@@ -520,6 +527,7 @@ impl State {
                                             let item = Product::new("Flour".to_string(), None, f, e);
                                             trans.add_item(item);
                                             trans.settle_bill(paid);
+                                            if !trans.bill_settled {self.package.ext_debt =  fetch_ext_debt_holders().unwrap();}
                                             self.package.money_in.push(trans.to_owned());
                                             trans.balance_books(&mut self.package.fin_prod);
                                             trans.log();
@@ -666,7 +674,7 @@ impl State {
         
     }
 
-    pub fn daily_window( &mut self, ctx: &CtxRef ) {
+    pub fn daily_window(&mut self, ctx: &CtxRef ) {
         let frame = crate::styles::get_frame();
         Window::new("Add to daily yield (kg)").default_width(400.).frame(frame)
          .show(ctx, |ui|{
@@ -888,24 +896,191 @@ impl State {
     }
     
     pub fn external_debts(&mut self, ui: &mut Ui) {
-        // properties:
-        // all incomplete transactions
-        // filter by person -> settle all method
-        //                  -> settle a single transaction
-        //                  -> partly settle the debt
+
         ui.columns(3,|col|{
+            // set the temp bools
             col[0].label(RichText::new("Unaowadai"));
             col[0].separator();
 
             ScrollArea::vertical().show(&mut col[0], |ui|{
-                ui.label("aaaaa");
+                for (i, p) in self.package.ext_debt.iter().enumerate() {
+                    ui.label(&p.person.name);
+                    ui.label(RichText::new(&p.person.tel).small() );
+                    ui.label(RichText::new(format!("Ksh. {}",&p.total_amount)).color(Color32::RED) );
+                    if ui.button("more ..").clicked() { 
+                        self.editor.g = i.to_string();
+                        self.editor.i = true; 
+                        self.editor.j = false 
+                    }
+                    
+                    ui.separator();
+                }
             });
+
+            if self.editor.i {
+                col[1].add_space(20.);
+                if let Ok(index) = self.editor.g.parse::<usize>(){
+                    if let Some(de) = self.package.ext_debt.get(index) {
+                        col[1].label(RichText::new(&de.person.name).strong().underline());
+                        col[1].add_space(10.);
+                        col[1].horizontal(|ui|{
+                            ui.label("amount to pay: ");
+                            ui.add_space(10.);
+                            ui.label(RichText::new(&de.total_amount.to_string()).color(Color32::RED));
+                        });
+                        col[1].add_space(15.);
+                        col[1].text_edit_multiline(&mut self.editor.f);
+                        col[1].add_space(10.);
+                        if col[1].button("settle ..").clicked(){
+                            // paying logic
+                            // update transactions list
+                        }
+
+                        col[1].add(Separator::default().spacing(10.));
+                        col[1].label("associated transactions");
+                        col[1].add(Separator::default().spacing(10.));
+                        ScrollArea::vertical().id_source("scroll2").show(&mut col[1], |ui|{
+                            for trans in &self.package.money_in {
+                                if trans.balance.is_some() && trans.buyer == de.person{
+                                    // ******* if i ever add another product.. this will break ******* //
+                                    ui.label(&trans.time);
+                                    ui.label(RichText::new(format!("quantity: {}",&trans.items[0].quantity)));
+                                    ui.label(RichText::new(format!("total cost: {}",&trans.total_cost)));
+                                    ui.label(RichText::new(format!("unpaid balance: {}",&trans.balance.unwrap())));
+                                    ui.separator();
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            
+            col[2].label(RichText::new("search corner"));
+            col[2].separator();
+            let search = col[2].text_edit_singleline(&mut self.editor.a);
+            
+            if search.changed() {
+                let p: Vec<_> = self.package.ext_debt.to_owned().into_iter().filter(|per|{
+                    per.person.name.contains(&self.editor.a)
+                }).collect();
+                self.vecs.e = p;
+            }
+            ScrollArea::vertical().id_source("scroll3").show(&mut col[2], |ui|{
+                for p in self.vecs.e.iter() {
+                    ui.label(&p.person.name);
+                    ui.label(RichText::new(&p.person.tel).small() );
+                    ui.label(RichText::new(format!("Ksh. {}",&p.total_amount)).color(Color32::RED) );
+                    if ui.button("more ..").clicked() { 
+
+                        for (i,debtee) in self.package.ext_debt.iter().enumerate() {
+                            if debtee.person == p.person {
+                                self.editor.g = i.to_string();
+                                self.editor.i = true; 
+                                self.editor.j = false;
+                                break;
+                            }
+                        }
+                    }
+                    ui.separator();
+                }
+            });
+
+
         });
 
     }
 
     fn internal_debts(&mut self, ui: &mut Ui) {
-        ui.label("lets begun");
+        ui.columns(3,|col|{
+            // set the temp bools
+            col[0].label(RichText::new("Wanaokudai"));
+            col[0].separator();
+
+            ScrollArea::vertical().show(&mut col[0], |ui|{
+                for (i, p) in self.package.int_debt.iter().enumerate() {
+                    ui.label(&p.person.name);
+                    ui.label(RichText::new(&p.person.tel).small() );
+                    ui.label(RichText::new(format!("Ksh. {}",&p.total_amount)).color(Color32::RED) );
+                    if ui.button("more ..").clicked() { 
+                        self.editor.g = i.to_string();
+                        self.editor.i = true; 
+                        self.editor.j = false 
+                    }
+                    
+                    ui.separator();
+                }
+            });
+
+            if self.editor.i {
+                col[1].add_space(20.);
+                if let Ok(index) = self.editor.g.parse::<usize>(){
+                    if let Some(de) = self.package.int_debt.get(index) {
+                        col[1].label(RichText::new(&de.person.name).strong().underline());
+                        col[1].add_space(10.);
+                        col[1].horizontal(|ui|{
+                            ui.label("amount to pay: ");
+                            ui.add_space(10.);
+                            ui.label(RichText::new(&de.total_amount.to_string()).color(Color32::RED));
+                        });
+                        col[1].add_space(15.);
+                        col[1].text_edit_multiline(&mut self.editor.f);
+                        col[1].add_space(10.);
+                        if col[1].button("settle ..").clicked(){
+                            // paying logic
+                            // update transactions list
+                        }
+
+                        col[1].add(Separator::default().spacing(10.));
+                        col[1].label("associated transactions");
+                        col[1].add(Separator::default().spacing(10.));
+                        ScrollArea::vertical().id_source("scroll2").show(&mut col[1], |ui|{
+                            for trans in &self.package.money_out {
+                                if trans.balance.is_some() && trans.person == de.person{
+                                    ui.label(&trans.time);
+                                    ui.label(RichText::new(format!("raw material: {}",&trans.raw_mat.material )));
+                                    ui.label(RichText::new(format!("quantity: {}",&trans.raw_mat.available_quantity )));
+                                    ui.label(RichText::new(format!("total cost: {}",&trans.total_cost)));
+                                    ui.label(RichText::new(format!("unpaid balance: {}",&trans.balance.unwrap())));
+                                    ui.separator();
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            
+            col[2].label(RichText::new("search corner"));
+            col[2].separator();
+            let search = col[2].text_edit_singleline(&mut self.editor.a);
+            
+            if search.changed() {
+                let p: Vec<_> = self.package.int_debt.to_owned().into_iter().filter(|per|{
+                    per.person.name.contains(&self.editor.a)
+                }).collect();
+                self.vecs.f = p;
+            }
+            ScrollArea::vertical().id_source("scroll3").show(&mut col[2], |ui|{
+                for p in self.vecs.f.iter() {
+                    ui.label(&p.person.name);
+                    ui.label(RichText::new(&p.person.tel).small() );
+                    ui.label(RichText::new(format!("Ksh. {}",&p.total_amount)).color(Color32::RED) );
+                    if ui.button("more ..").clicked() { 
+
+                        for (i,debtee) in self.package.int_debt.iter().enumerate() {
+                            if debtee.person == p.person {
+                                self.editor.g = i.to_string();
+                                self.editor.i = true; 
+                                self.editor.j = false;
+                                break;
+                            }
+                        }
+                    }
+                    ui.separator();
+                }
+            });
+
+
+        });
     }
 }
 

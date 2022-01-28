@@ -1,12 +1,13 @@
 
-mod setup;
+mod salepoint;
 mod styles;
+// pub mod setup;
 
-use setup::State;
+use salepoint::State;
 use eframe::egui::Vec2;
 
 fn main() {
-    let app = State::new();
+    let app = State::default();
     let mut native_options = eframe::NativeOptions::default();
     native_options.resizable = false;
     native_options.initial_window_size=Some(Vec2::new(900.0, 620.0));
