@@ -1,13 +1,13 @@
 ---
 - product:
     name: Unga
-  quantity: 199.0
+  quantity: 27.919983
 - product:
     name: flour
   quantity: 145.0
 - product:
     name: qwerty
-  quantity: 521.4
+  quantity: 511.80002
 - product:
     name: asew
   quantity: 166.0

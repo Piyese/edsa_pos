@@ -1,6 +1,6 @@
 #![allow(unused_variables,unused_imports,dead_code)]
 
-use std::path::Path;
+use std::{path::Path, fs::{OpenOptions, self}, io::Write};
 
 use eframe::{epi::App, egui::{self, CtxRef, TopBottomPanel, Layout, Button, RichText, Separator, Label, Color32, Sense, FontDefinitions, TextStyle, FontFamily, SidePanel, panel::Side, CentralPanel, Ui, ScrollArea, Window, Align, Direction}};
 use edsa_pos::{pipeline::{
@@ -28,6 +28,7 @@ pub struct TempVecs {
     prod_actual: Vec<Product>,
     index: usize,
     fp_index: usize,
+    pkg_index: usize,
 
 }
 impl Default for TempVecs {
@@ -58,6 +59,7 @@ impl Default for TempVecs {
             prod_actual: Default::default(),
             index: 0,
             fp_index: 0,
+            pkg_index: 0,
         }
     }
 }
@@ -73,8 +75,7 @@ pub struct PkgLists {
     pkg_prod: Vec<PackagedProd>,
     raw_mat: Vec<RawMaterial>,
     debtors: Vec<Debtor>,
-    creditors: Vec<Creditor>,
-    // dyield: DailyRecords,    
+    creditors: Vec<Creditor>,   
 }
 impl Default for PkgLists {
     fn default() -> Self {
@@ -859,7 +860,7 @@ impl State {
             ui.separator();
             // /////////////////////////////////////////////////////
             // normal window
-            if !self.editor.k && !self.editor.r {
+            if !self.editor.k && !self.editor.r && !self.editor.s {
                 // ////////////////////////////////////////////////////////////////////////////
                 ui.label(RichText::new("In Stock(Unpacked)").strong().underline());
                 ui.add_space(10.);
@@ -915,7 +916,10 @@ impl State {
                             });
                             ui.with_layout(Layout::right_to_left(), |ui|{
                                 ui.add_space(2.);
-                                if ui.button(RichText::new("Add")).clicked() {}
+                                if ui.button(RichText::new("Add")).clicked() {
+                                    self.tvecs.pkg_index = i;
+                                    self.editor.s = true;
+                                }
                             });
                         });
                         ui.horizontal(|ui|{
@@ -1009,7 +1013,7 @@ impl State {
                 ui.text_edit_singleline(&mut self.editor.i);
                 ui.horizontal(|ui|{
                     ui.with_layout(Layout::right_to_left(),|ui|{
-                        ui.add_space(10.);
+                        ui.add_space(15.);
                         if ui.button(RichText::new("Close")).clicked() { 
                             self.editor.r = false;
                         }
@@ -1034,6 +1038,48 @@ impl State {
                                 self.tvecs.dy = dy;
                                 // finally
                                 self.editor.r = false;
+                            }
+                        }
+                    });
+                });
+            }
+            // packing options
+            if self.editor.s {
+                let string = format!("add {} packed items",self.apk.pkg_prod[self.tvecs.pkg_index].pkg_specify);
+                ui.label(RichText::new(&string));
+                ui.add_space(5.);
+                ui.text_edit_singleline(&mut self.editor.j);
+                ui.horizontal(|ui|{
+                    ui.with_layout(Layout::right_to_left(), |ui|{
+                        ui.add_space(10.);
+                        if ui.button(RichText::new("Close")).clicked() {
+                            self.editor.s = false;
+                        }
+                        if ui.button(RichText::new("Add")).clicked() {
+                            // choose specific product
+                            if let Ok(packs) = self.editor.j.parse::<u32>() {
+                                for fp in  self.apk.fin_prod.iter_mut() {
+                                    if fp.product == self.apk.pkg_prod[self.tvecs.pkg_index].product {
+                                        let qty = self.apk.pkg_prod[self.tvecs.pkg_index].quantity * packs as f32;
+                                        // subtract quantity 
+                                        fp.quantity -= qty;
+                                        break; 
+                                    }
+                                }
+                                // log the change
+                                let path = Path::new("records/finprod");
+                                let item_log=serde_yaml::to_vec(&self.apk.fin_prod.to_owned()).unwrap();
+                                let mut file=fs::File::create(path).expect("cant open file");
+                                file.write_all(&item_log).expect("cant write into..");
+                                
+                                self.apk.pkg_prod[self.tvecs.pkg_index].total += packs;
+                                // log the change
+                                let path2 = Path::new("records/pkgprod");
+                                let item_log2=serde_yaml::to_vec(&self.apk.pkg_prod.to_owned()).unwrap();
+                                let mut file=fs::File::create(path).expect("cant open file");
+                                file.write_all(&item_log).expect("cant write into..");
+                                
+                                self.editor.s = false;
                             }
                         }
                     });
@@ -1313,7 +1359,7 @@ impl State {
                 // //////////////////////////////////////////////////////////////////
                 b[0].label(RichText::new("Daily Records").strong().underline());
 
-                b[0].separator();
+                // b[0].separator();
                 ScrollArea::vertical().id_source("dyscroll").max_height(200.)
                 .show(&mut b[0], |ui|{
                     for record in &self.tvecs.dy{

@@ -415,6 +415,7 @@ dependencies = [
  "edsa_pos",
  "eframe",
  "serde",
+ "serde_yaml",
  "tracing",
  "tracing-subscriber",
 ]

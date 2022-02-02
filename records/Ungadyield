@@ -13,3 +13,10 @@
   product:
     name: Unga
   quantity: 199.0
+- date:
+    year: 2022
+    month: 2
+    day: 2
+  product:
+    name: Unga
+  quantity: 200.0

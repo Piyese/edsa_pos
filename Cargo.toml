@@ -11,4 +11,5 @@ serde={version="1", features=["derive"]}
 confy = "0.4.0"
 tracing="0.1"
 tracing-subscriber = "0.2.25"
+serde_yaml="0.8.23"
 edsa_pos={path="../edsa_pos"}

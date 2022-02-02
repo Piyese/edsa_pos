@@ -4,13 +4,13 @@
   pkg_specify: Pembe
   quantity: 2.67
   cost: 145.0
-  total: 0
+  total: 24
 - product:
     name: qwerty
   pkg_specify: qwert
   quantity: 0.8
   cost: 90.0
-  total: 0
+  total: 12
 - product:
     name: Unga
   pkg_specify: qwert
