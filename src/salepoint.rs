@@ -2,12 +2,12 @@
 
 use std::path::Path;
 
-use eframe::{epi::App, egui::{self, CtxRef, TopBottomPanel, Layout, Button, RichText, Separator, Label, Color32, Sense, FontDefinitions, TextStyle, FontFamily, SidePanel, panel::Side, CentralPanel, Ui, ScrollArea, Window}};
+use eframe::{epi::App, egui::{self, CtxRef, TopBottomPanel, Layout, Button, RichText, Separator, Label, Color32, Sense, FontDefinitions, TextStyle, FontFamily, SidePanel, panel::Side, CentralPanel, Ui, ScrollArea, Window, Align, Direction}};
 use edsa_pos::{pipeline::{
     accounts::{Debtor, Creditor, OutTransaction, TransactionIn}, 
-    inventory::{FinishedProd, RawMaterial, PackagedProd, Product, Production}, 
+    inventory::{FinishedProd, RawMaterial, PackagedProd, Product, Production, DailyYield}, 
     people::{Person, Employee}
-}, fetch_logs, PathOption, LogPartial};
+}, fetch_logs, PathOption, LogPartial, fetch_daily_logs};
 
 use crate::styles::top_panel_frame;
 
@@ -23,9 +23,27 @@ pub struct TempVecs {
     pip_actual: Vec<Person>,
     pkg: Vec<PackagedProd>,
     actual_pkg_list: Vec<PackagedProd>,
+    dy: Vec<Vec<DailyYield>>,
+    prod: Vec<Product>,
+    prod_actual: Vec<Product>,
+    index: usize,
+    fp_index: usize,
+
 }
 impl Default for TempVecs {
     fn default() -> Self {
+        let mut dy: Vec<Vec<DailyYield>> = Vec::new();
+        let p_list = fetch_logs::<Product>(PathOption::Product).unwrap();
+        dbg!(&p_list);
+        for pr in p_list {
+            let path_str = format!("records/{}dyield",&pr.name);
+            println!("{}",path_str);
+            let path = Path::new(&path_str);
+            let list = fetch_daily_logs(path).unwrap();
+            // dbg!(&list);
+            let _ = &dy.push(list);
+        }
+
         let pip_actual: Vec<Person> = Vec::new();
         Self { 
             rm: Default::default(), 
@@ -35,6 +53,11 @@ impl Default for TempVecs {
             pip_actual,
             pkg: Default::default(),
             actual_pkg_list: Default::default(),
+            dy,
+            prod: Default::default(),
+            prod_actual: Default::default(),
+            index: 0,
+            fp_index: 0,
         }
     }
 }
@@ -87,6 +110,10 @@ pub struct Editor {
     m: bool,
     n: bool,
     o: bool,
+    p: bool,
+    q: bool,
+    r: bool,
+    s: bool,
 }
 impl Editor {
     pub fn new() -> Self {
@@ -106,6 +133,10 @@ impl Editor {
             m:false,
             n:false,
             o:false, 
+            p:false, 
+            q:false,
+            r: false,
+            s: false, 
         } 
     }
 }
@@ -796,51 +827,550 @@ impl State {
 
         SidePanel::new(Side::Left, "left_side").min_width(300.).max_width(300.).frame(frame)
         .show(ctx, |ui| {
-            // add a product
+            ui.set_style(crate::styles::top_panel_style());
+            // add a product ///////////////////////////////////////
             ui.label(RichText::new("add a new product"));
             ui.text_edit_singleline(&mut self.editor.a);
             ui.add_space(5.);
             if ui.button("add").clicked() {
-                
+                if self.editor.a.len()>2 {
+                    let pr = Product::new(self.editor.a.to_owned());
+
+                    // a new product should automatically allocate store space
+                    let fp = FinishedProd::new(pr.to_owned());
+                    let path2 = Path::new("records/finprod");
+                    self.apk.fin_prod.push(fp.to_owned());
+                    fp.log(path2);
+
+                    // and a default daily yield to start off
+                    let pr2 = pr.clone();
+
+                    // update local list
+                    self.apk.product.push(pr.to_owned());
+                    // log
+                    let path = Path::new("records/products");
+                    pr.log(path);
+
+                    // and a default daily yield to start off
+                    DailyYield::new(pr2, 0.0);
+                    self.editor.a = String::default();
+                }
             }
             ui.separator();
-
-            ui.label(RichText::new("raw materials").underline() );
-
-            ScrollArea::vertical().id_source("raw_mat").max_height(100.)
-            .show(ui, |ui| {
-                for (i, rm) in self.apk.raw_mat.iter().enumerate() {
-                    ui.horizontal(|ui|{
-                        ui.label((i+1).to_string());
+            // /////////////////////////////////////////////////////
+            // normal window
+            if !self.editor.k && !self.editor.r {
+                // ////////////////////////////////////////////////////////////////////////////
+                ui.label(RichText::new("In Stock(Unpacked)").strong().underline());
+                ui.add_space(10.);
+                ScrollArea::vertical().id_source("finprod").max_height(200.)
+                .show(ui, |ui|{
+                    for (i, fp) in self.apk.fin_prod.iter().enumerate() {
+                        ui.horizontal(|ui|{
+                            ui.with_layout(Layout::left_to_right(), |ui|{
+                                ui.label(RichText::new(&fp.product.name));
+                                let tstr = format!(",{} kg",&fp.quantity);
+                                ui.label(RichText::new(&tstr))
+                            });
+                            ui.with_layout(Layout::right_to_left(), |ui|{
+                                ui.add_space(5.);
+                                if ui.button(RichText::new("add")).clicked() {
+                                    // add finidhed product.. coming from production ***********
+                                    self.editor.r = true;
+                                    self.tvecs.fp_index = i;
+                                }
+                            });
+                        });
+                        ui.add_space(5.);
+                    }
+                });
+                ui.separator();
+                // /////////////////////////////////////////////////////////////////////////////
+    
+                // /////////////////////////////////////////////////////////////////////
+                ui.horizontal_top(|ui| {
+                    ui.add_space(10.);
+                    ui.label(RichText::new("Packaged Products").strong().underline());
+                
+                    ui.add_space(25.);
+                    if ui.button(RichText::new("new brand ➕ ")).clicked() {
+                        // add a new brand ***************************
+                        self.editor.k = true;
+                        self.tvecs.item_list = Vec::new();
+                    }
+                });
+                ui.add_space(10.);
+                
+                ScrollArea::vertical().id_source("pkgprod")//.max_height(100.)
+                .show(ui, |ui|{
+                    for (i, pkg) in self.apk.pkg_prod.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.with_layout(Layout::left_to_right(), |ui|{
+                                ui.label(RichText::new((i+1).to_string()));
+                                // ui.separator();
+                                ui.label(RichText::new(&pkg.pkg_specify));
+                                // ui.add_space(10.);
+                                let fstr = format!("{} packs",&pkg.total);
+                                ui.label(RichText::new(fstr));
+                            });
+                            ui.with_layout(Layout::right_to_left(), |ui|{
+                                ui.add_space(2.);
+                                if ui.button(RichText::new("Add")).clicked() {}
+                            });
+                        });
+                        ui.horizontal(|ui|{
+                            ui.with_layout(Layout::right_to_left(), |ui|{
+                                ui.add_space(2.);
+                                let f = format!("{}, {}kg",&pkg.product.name, &pkg.quantity);
+                                ui.label(RichText::new(&f));
+                            });
+                        });
                         ui.separator();
-                        ui.label(&rm.name);
-                        ui.add_space(10.);
-                        ui.label(&rm.quantity.to_string());
+                    }
+                });
+                // //////////////////////////////////////////////////////////////////////////
+            }
+            // adding a new packaged product
+            if self.editor.k {
+                ui.label(RichText::new("New Brand"));
+                ui.add_space(5.);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("product"));
+                    if ui.button(RichText::new("choose")).clicked() {
+                        self.editor.l = true;
+                        self.tvecs.item_list = Vec::new();
+                    }
+                    if !self.tvecs.item_list.is_empty() {
+                        ui.label(RichText::new(&self.tvecs.item_list[0] ));
+                    }
+                });
+                // pause
+                if self.editor.l {
+                    ScrollArea::vertical().id_source("productscroll").max_height(100.)
+                    .show(ui, |ui|{
+                        ui.label(RichText::new("products"));
+                        for (i, pr) in self.apk.product.iter().enumerate() {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new((i+1).to_string()));
+                                ui.label(RichText::new(&pr.name));
+                                if ui.button(RichText::new("pick")).clicked() {
+                                    let _ = &self.tvecs.item_list.push(pr.name.to_owned());
+                                    self.editor.l = false;
+                                }
+                            });
+                        }
                     });
                 }
-            });
+                // continue
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("name:   "));
+                    ui.text_edit_singleline(&mut self.editor.b);
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("quantity:"));
+                    ui.text_edit_singleline(&mut self.editor.j);
+                });
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("price:   "));
+                    ui.text_edit_singleline(&mut self.editor.i);
+                });
+                ui.horizontal(|ui| {
+                    if ui.button(RichText::new("Add")).clicked() {
+                        if let Ok(qty) = self.editor.j.parse::<f32>() {
+                            if let Ok(price) = self.editor.i.parse::<u32>() {
+                                if qty > 0.0 && !self.tvecs.item_list.is_empty() {
+                                    
+                                    let prd = Product::new(self.tvecs.item_list[0].to_owned() );
+                                    let mut pkg = PackagedProd::new(prd);
 
-            ui.separator();
+                                    pkg.specify_cost(price as f32);
+                                    pkg.specify_pkg(self.editor.b.to_owned());
+                                    pkg.specify_qty(qty);
+                                    self.apk.pkg_prod.push(pkg.to_owned());
 
-            ui.label(RichText::new("Finished Products"));
+                                    let path = Path::new("records/pkgprod");
+                                    pkg.log(path);
 
-            ScrollArea::vertical().id_source("pkgprod").max_height(100.)
-            .show(ui, |ui|{
-                for (i, fp) in self.apk.fin_prod.iter().enumerate() {
-                    ui.horizontal(|ui|{
-                        ui.label(RichText::new((i+1).to_string()));
-                        ui.separator();
-                        ui.label(RichText::new(&fp.product.name));
+                                    self.editor.k = false;
+                                }
+                            }
+                        }
+                    }
+                    ui.add_space(5.);
+                    if ui.button(RichText::new("Close")).clicked() {
+                        self.editor.k = false;
+                    }
+                });
+            }
+            // adding to stock (Dailyyield)
+            if self.editor.r {
+                let sftr = format!("add {} stock:", self.apk.fin_prod[self.tvecs.fp_index].product.name);
+                ui.label(RichText::new(&sftr));
+                ui.text_edit_singleline(&mut self.editor.i);
+                ui.horizontal(|ui|{
+                    ui.with_layout(Layout::right_to_left(),|ui|{
                         ui.add_space(10.);
-                        ui.label(RichText::new(&fp.quantity.to_string()));
-                        ui.button(RichText::new("add"));
+                        if ui.button(RichText::new("Close")).clicked() { 
+                            self.editor.r = false;
+                        }
+                        if ui.button(RichText::new("Done")).clicked() {
+                            if let Ok(qty) = self.editor.i.parse::<f32>() {
+                                // this will-> update finprod log and daily log
+                                let _ = DailyYield::new(self.apk.fin_prod[self.tvecs.fp_index].product.to_owned(), qty);
+                                // reorder the tampered lists
+                                self.apk.fin_prod  = fetch_logs::<FinishedProd>(PathOption::FinProd).unwrap();
+                                
+                                let mut dy: Vec<Vec<DailyYield>> = Vec::new();
+                                {
+                                    let p_list = fetch_logs::<Product>(PathOption::Product).unwrap();
+                                    for pr in p_list {
+                                        let path_str = format!("records/{}dyield",&pr.name);
+                                        let path = Path::new(&path_str);
+                                        let list = fetch_daily_logs(path).unwrap();
+                                        let _ = &dy.push(list);
+                                    }
+                                    dbg!(&dy);
+                                }
+                                self.tvecs.dy = dy;
+                                // finally
+                                self.editor.r = false;
+                            }
+                        }
                     });
-                }
-            });
+                });
+            }
         });
 
+
         CentralPanel::default().frame(frame).show(ctx, |ui|{
-            ui.label("main frame")
+            ui.set_style(crate::styles::top_panel_style());
+            ui.add_space(10.);
+
+            ui.columns(3, |a|{
+                a[1].visuals_mut().override_text_color = Some(Color32::GRAY);
+                // ////////////////////////////////////////////////////////////////
+                a[0].label(RichText::new("Products"));
+                a[0].separator();
+                if self.apk.product.is_empty() {
+                    a[0].add_space(30.);
+                    a[0].label("seems you have no products you produce");
+                }else{
+                    ScrollArea::vertical().id_source("product scroll").max_height(210.)
+                    .show(&mut a[0], |ui| {
+                        for pr in self.apk.product.iter() {
+                            ui.label(RichText::new(&pr.name));
+                            ui.add_space(5.);
+                        }
+                    });
+                }
+                // ////////////////////////////////////////////////////////////////
+                if !self.editor.n {
+                    a[1].horizontal(|ui| {
+                        ui.label(RichText::new("Recent Productions"));
+                        ui.separator();
+                        if ui.button(RichText::new("initiate new")).clicked() {
+                            // new production logic
+                            self.editor.n = true;
+                        }
+                    });
+                    a[1].separator();
+
+                    if self.apk.production.is_empty() {
+                        a[1].add_space(30.);
+                        a[1].label("No production detected here.");
+                    }else{
+                        ScrollArea::vertical().id_source("prodscroll").max_height(200.)
+                        .show(&mut a[1], |ui|{
+                            for (i, prod) in self.apk.production.iter().enumerate() {
+                                let date = format!(
+                                    "{}-{}-{}",
+                                    &prod.date.day,
+                                    &prod.date.month,
+                                    &prod.date.year 
+                                );
+                                ui.horizontal(|ui| {
+                                    ui.with_layout(Layout::left_to_right(), |ui|{
+                                        ui.add_space(5.);
+                                        ui.label(RichText::new(&prod.product.name));
+                                    });
+                                    ui.with_layout(Layout::right_to_left(), |ui|{
+                                        if ui.button(RichText::new("more info")).clicked() {
+                                            self.editor.m = true;
+                                            self.tvecs.index = i;
+                                        }
+                                        ui.add_space(5.);
+                                    });
+                                });
+                            }
+                        });
+                    }
+                }else{
+                    // new production
+                    a[1].horizontal(|ui|{
+                        let back =ui.add(Button::new(RichText::new("◀ back")));
+                        if back.clicked() {
+                            self.editor.n = false;
+                        }
+                        ui.label(RichText::new("To Produce ..."));
+                    });
+                    a[1].separator();
+
+                    a[1].add_space(5.);
+                    a[1].horizontal(|ui|{
+                        ui.label(RichText::new("Product"));
+                        ui.add_space(5.);
+                        let choose = ui.button("choose"); ui.add_space(5.);
+                        if choose.clicked() {
+                            self.editor.p = true; // redundant *******************************
+                        }
+                        if !self.tvecs.prod_actual.is_empty() {
+                            ui.label(RichText::new(&self.tvecs.prod_actual[0].name));
+                        }
+                    });
+                    a[1].label(RichText::new("Materials .."));
+                    ScrollArea::vertical().id_source("raw_p_scroll").max_height(160.)
+                    .show(&mut a[1], |ui|{
+                        let mut ind: usize = 0; 
+                        for (i, item) in self.tvecs.actual_item_list.iter().enumerate() {
+                            ui.horizontal(|ui| {
+                                ui.with_layout(Layout::left_to_right(), |ui|{
+                                    ui.label(RichText::new(&item.name));
+                                    ui.separator();
+                                    let qty = format!("qty: {}kg",item.quantity);
+                                    ui.label(RichText::new(&qty));
+                                });
+                                ui.with_layout(Layout::right_to_left(), |ui|{
+                                    ui.add_space(5.);
+                                    if ui.button(RichText::new("❎")).clicked() {
+                                        ind = i;
+                                        self.editor.o = true;
+                                    }
+                                    ui.separator();
+                                });
+                            });
+                        }
+                        if self.editor.o {
+                            self.tvecs.actual_item_list.remove(ind);
+                            self.editor.o = false;
+                        }
+                    });
+                    a[1].add_space(7.);
+                    if !self.tvecs.prod_actual.is_empty() && !self.tvecs.actual_item_list.is_empty(){
+                        if a[1].button(RichText::new("DONE")).clicked() {
+                            let mut p = Production::new(self.tvecs.prod_actual[0].to_owned());
+                            for rm in &self.tvecs.actual_item_list {
+                                p.add_rawmat(rm);
+                            }
+                            let path = Path::new("records/production");
+                            p.log(path);
+                            self.editor.n = false;
+                            // re-fetch the raw_materials list and production list
+                            self.apk.raw_mat = fetch_logs::<RawMaterial>(PathOption::RawMat).unwrap();
+                            self.apk.production = fetch_logs::<Production>(PathOption::Production).unwrap();
+                        }
+                    }
+
+                }
+                // ////////////////////////////////////////////////////////////////////////////////////
+                if !self.editor.n {
+                    a[2].indent("third", |ui| {
+                        ui.label(RichText::new("More Info Tab"));
+                        // more (if)s logic
+                        if self.editor.m {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new(&self.apk.production[self.tvecs.index].product.name));
+                                ui.separator();
+                                let date = format!(
+                                    "{}-{}-{}",
+                                    &self.apk.production[self.tvecs.index].date.day,
+                                    &self.apk.production[self.tvecs.index].date.month,
+                                    &self.apk.production[self.tvecs.index].date.year 
+                                );
+                                ui.label(RichText::new(&date));
+                            });
+                            ScrollArea::vertical().id_source("prodmatscroll").max_height(200.)
+                            .show(ui, |ui|{
+                                for prod_rms in self.apk.production[self.tvecs.index].raw_mat.iter() {
+                                    // ui.horizontal(|ui|{
+                                    //     ui.with_layout(Layout::left_to_right(),|ui|{});
+                                    //     ui.with_layout(Layout::right_to_left(),|ui|{});
+                                    // });
+                                    ui.horizontal(|ui|{
+                                        ui.with_layout(Layout::left_to_right(),|ui|{
+                                            ui.add_space(10.);
+                                            ui.label(RichText::new(&prod_rms.name));
+                                        });
+                                        ui.with_layout(Layout::right_to_left(),|ui|{
+                                            ui.add_space(20.);
+                                            ui.label(RichText::new(&prod_rms.quantity.to_string()));
+                                        });
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }else if self.editor.p {
+                    // product list
+                    a[2].horizontal(|ui|{
+                        let back =ui.add(Button::new(RichText::new("◀ back")));
+                        if back.clicked() {
+                            self.editor.p = false;
+                        }
+                        ui.separator();
+                        ui.label("Search").on_hover_text("type to narrow search");
+                    });
+                    a[2].add_space(5.);
+                    let search = a[2].text_edit_singleline(&mut self.editor.f);
+                    a[2].add_space(5.);
+                    a[2].separator();
+
+                    if search.changed() {
+                        let p: Vec<_> = self.apk.product.to_owned().into_iter().filter(|pr|{
+                            pr.name.contains(&self.editor.f)
+                        }).collect();
+                        self.tvecs.prod = p;
+                    }
+
+                    ScrollArea::vertical().id_source("pr_pr_scroll").max_height(180.)
+                    .show(&mut a[2], |ui|{
+                        for  sp in self.tvecs.prod.iter(){
+                            ui.label(&sp.name);
+                            if ui.button("pick").clicked(){
+                                self.tvecs.prod_actual = Vec::new();
+                                self.tvecs.prod_actual.push(sp.to_owned());
+                                self.editor.p = false;
+                            };
+                            ui.separator();
+                        }
+                    });
+                }else if self.editor.q {
+                    a[2].horizontal(|ui| {
+                        let back =ui.add(Button::new(RichText::new("◀ back")));
+                        if back.clicked() {
+                            self.editor.q = false;
+                        }
+                        ui.label(RichText::new("quantity of .."));
+                        if !self.tvecs.item_list.is_empty() {
+                            let i = self.tvecs.item_list.len()-1;
+                            let name = &self.tvecs.item_list[i];
+                            ui.label(RichText::new(&self.tvecs.item_list[i]));
+                        }
+                    });
+                    a[2].add_space(5.);
+                    a[2].text_edit_singleline(&mut self.editor.h);
+                    a[2].horizontal(|ui|{
+                        ui.add_space(50.);
+                        if ui.button(RichText::new("add")).clicked() {
+                            if let Ok(qty) = self.editor.h.parse::<f32>() {
+                                let i = self.tvecs.item_list.len()-1;
+                                let rm = RawMaterial::new(self.tvecs.item_list[i].to_owned(),qty);
+                                self.tvecs.actual_item_list.push(rm);
+                                self.editor.q = false
+                            }
+                        }
+                        if ui.button(RichText::new("Close")).clicked() { self.editor.q = false }
+                    });
+
+                }else {
+                    a[2].horizontal( |ui| {
+                        ui.label(RichText::new("material search"));
+                        let search = ui.text_edit_singleline(&mut self.editor.d);
+                        if search.changed() {
+                            let p: Vec<_> = self.apk.raw_mat.to_owned().into_iter().filter(|rm|{
+                                rm.name.contains(&self.editor.d)
+                            }).collect();
+                            dbg!(&p);
+                            self.tvecs.rm = p;
+                        }
+                    });
+                    a[2].separator();
+        
+                    ScrollArea::vertical().id_source("search_prod_scroll").max_height(180.)
+                      .show(&mut a[2], |ui|{
+                        for rm in self.tvecs.rm.iter() {
+                            ui.label(RichText::new(&rm.name));
+                            ui.add_space(5.);
+                            let tstr = format!("remaining quantity: {}",&rm.quantity);
+                            ui.label(RichText::new(tstr));
+                            ui.add_space(5.);
+                            if ui.button("pick").clicked() {
+                                // add to list // pop a window
+                                self.tvecs.item_list.push(rm.name.to_owned()); // might changge
+                                dbg!(&self.tvecs.item_list);
+                                self.editor.q = true;
+                            }
+                            ui.add_space(5.);
+                            ui.separator();
+                        }
+                    });
+                }
+                // ///////////////////////////////////////////////////////////////////////////////////
+            });
+            ui.separator();
+
+
+            ui.columns(2, |b|{
+                // //////////////////////////////////////////////////////////////////
+                b[0].label(RichText::new("Daily Records").strong().underline());
+
+                b[0].separator();
+                ScrollArea::vertical().id_source("dyscroll").max_height(200.)
+                .show(&mut b[0], |ui|{
+                    for record in &self.tvecs.dy{
+                        if record.len() > 1 {
+                            let i = record.len()-1;
+                            let date = format!(
+                                "{}-{}-{}",
+                                &record[i].date.day,
+                                &record[i].date.month,
+                                &record[i].date.year 
+                            );
+                            ui.horizontal(|ui|{
+                                ui.with_layout(Layout::left_to_right(),|ui|{
+                                    ui.label(RichText::new(&date));
+                                    ui.separator();
+                                    ui.label(RichText::new(&record[i].product.name));
+                                });
+                                ui.with_layout(Layout::right_to_left(),|ui|{
+                                    ui.add_space(8.);
+                                    let temp = format!("{} kg",&record[i].quantity.to_string());
+                                    ui.label(RichText::new(&temp));
+                                });
+                            });
+                            ui.add_space(8.);
+                            // ui.separator();
+                        }
+                    }
+                });
+
+                // ////////////////////////////////////////////////////////////////////
+                b[1].add_space(10.);
+                b[1].label(RichText::new("Raw Materials").underline());
+                b[1].add_space(7.);
+                if self.apk.raw_mat.is_empty() {
+                    b[1].add_space(30.);
+                    b[1].label("seems you have no materials in stock right now.");
+                }else{
+                    ScrollArea::vertical().id_source("rawmatcsroll")
+                    .show(&mut b[1], |ui| {
+                        for item in self.apk.raw_mat.iter() {
+                            ui.horizontal(|ui| {
+                                ui.label(RichText::new(&item.name));
+                                ui.separator();
+                            });
+                            ui.add_space(5.);
+                            ui.horizontal(|ui|{
+                                let qty = format!("quantity: {}kg",item.quantity);
+                                ui.label(RichText::new(&qty));
+                                ui.separator();
+                            });
+                            ui.add_space(5.);
+                            ui.separator();
+                        } 
+                    });
+                }
+            });
+
         });
 
     }
@@ -849,7 +1379,7 @@ impl State {
         let frame = crate::styles::top_panel_frame();
         let sp = SidePanel::new(Side::Left, "side_menu").min_width(130.).max_width(130.).frame(frame);
         sp.show(ctx, |ui|{
-
+            
             ui.set_style(crate::styles::top_panel_style());
 
             ui.add_space(10.);
@@ -939,11 +1469,11 @@ impl State {
         let mut font_def = FontDefinitions::default();
         font_def.font_data.insert(
             "broadway".to_owned(),
-            egui::FontData::from_static(include_bytes!("/home/klan/edsa/edsafeeds/fonts/BroadwayRegular-7Bpow.ttf")),
+            egui::FontData::from_static(include_bytes!("/home/klan/edsa/edsa_feeds/fonts/SeratUltra-1GE24.ttf")),
         );
         font_def.family_and_size.insert(
             TextStyle::Body,
-            (FontFamily::Monospace, 20.),
+            (FontFamily::Monospace, 25.),
         );
         font_def.family_and_size.insert(
             TextStyle::Heading, 

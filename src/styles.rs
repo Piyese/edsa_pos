@@ -86,22 +86,22 @@ pub fn widget_light() -> Widgets {
             bg_fill: Color32::LIGHT_GREEN, // button background
             bg_stroke: Default::default(),
             fg_stroke: Stroke::new(1.0, Color32::BLACK), // button text
-            corner_radius: 2.0,
-            expansion: 1.5,
+            corner_radius: 10.0,
+            expansion: 0.0,
         },
         hovered: WidgetVisuals {
             bg_fill: Color32::from_rgb(222, 184, 135),
-            bg_stroke: Stroke::new(2.0, Color32::from_gray(105)), // e.g. hover over window edge or button
+            bg_stroke: Stroke::new(1.0, Color32::from_gray(105)), // e.g. hover over window edge or button
             fg_stroke: Stroke::new(2.0, Color32::RED),
-            corner_radius: 1.0,
-            expansion: 3.,
+            corner_radius: 10.0,
+            expansion: 1.5,
         },
         active: WidgetVisuals {
             bg_fill: Color32::LIGHT_BLUE,
-            bg_stroke: Stroke::new(4.0, Color32::BLACK),
-            fg_stroke: Stroke::new(4.0, Color32::BLACK),
-            corner_radius: 2.0,
-            expansion: 1.5,
+            bg_stroke: Stroke::new(1.0, Color32::BLACK),
+            fg_stroke: Stroke::new(2.0, Color32::BLACK),
+            corner_radius: 10.0,
+            expansion: 0.0,
         },
         open: WidgetVisuals {
             bg_fill: Color32::from_gray(220),
@@ -117,7 +117,7 @@ pub fn font_def()-> FontDefinitions {
     let mut font_def = FontDefinitions::default();
     font_def.font_data.insert(
         "broadway".to_owned(),
-        egui::FontData::from_static(include_bytes!("/home/klan/edsa/edsafeeds/fonts/BroadwayRegular-7Bpow.ttf")),
+        egui::FontData::from_static(include_bytes!("/home/klan/edsa/edsa_feeds/fonts/BroadwayRegular-7Bpow.ttf")),
     );
     font_def.family_and_size.insert(
         TextStyle::Body,

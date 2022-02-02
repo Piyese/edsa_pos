@@ -1,22 +1,22 @@
 ---
 - name: beans
-  quantity: 43.0
+  quantity: 785.0
   price_per: ~
 - name: maize
-  quantity: 225.0
+  quantity: -111.869995
   price_per: ~
 - name: maize germ
-  quantity: 65.0
+  quantity: 605.0
   price_per: ~
 - name: soya
-  quantity: 12.0
+  quantity: 5678.0
   price_per: ~
 - name: soya beans
-  quantity: 120.0
+  quantity: 62.129997
   price_per: ~
 - name: groundnuts
-  quantity: 0.0
+  quantity: 795.98
   price_per: ~
 - name: ugali mix
-  quantity: 45.0
+  quantity: 2500.13
   price_per: ~

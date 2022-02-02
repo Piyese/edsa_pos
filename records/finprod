@@ -1,0 +1,25 @@
+---
+- product:
+    name: Unga
+  quantity: 199.0
+- product:
+    name: flour
+  quantity: 145.0
+- product:
+    name: qwerty
+  quantity: 521.4
+- product:
+    name: asew
+  quantity: 166.0
+- product:
+    name: arimis
+  quantity: 423.0
+- product:
+    name: aszas
+  quantity: 121.0
+- product:
+    name: asasa
+  quantity: 197.0
+- product:
+    name: olla
+  quantity: 42.0

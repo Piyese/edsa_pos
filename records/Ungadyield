@@ -1,0 +1,15 @@
+---
+- date:
+    year: 2022
+    month: 1
+    day: 31
+  product:
+    name: Unga
+  quantity: 0.0
+- date:
+    year: 2022
+    month: 2
+    day: 1
+  product:
+    name: Unga
+  quantity: 199.0

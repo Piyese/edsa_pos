@@ -1,0 +1,8 @@
+---
+- date:
+    year: 2022
+    month: 2
+    day: 1
+  product:
+    name: aszas
+  quantity: 121.0

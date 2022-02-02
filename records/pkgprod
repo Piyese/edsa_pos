@@ -1,0 +1,43 @@
+---
+- product:
+    name: Unga
+  pkg_specify: Pembe
+  quantity: 2.67
+  cost: 145.0
+  total: 0
+- product:
+    name: qwerty
+  pkg_specify: qwert
+  quantity: 0.8
+  cost: 90.0
+  total: 0
+- product:
+    name: Unga
+  pkg_specify: qwert
+  quantity: 0.8
+  cost: 90.0
+  total: 0
+- product:
+    name: Unga
+  pkg_specify: qwert
+  quantity: 0.8
+  cost: 90.0
+  total: 0
+- product:
+    name: Unga
+  pkg_specify: Jogoo
+  quantity: 0.5
+  cost: 120.0
+  total: 0
+- product:
+    name: qwerty
+  pkg_specify: Jogoo
+  quantity: 0.5
+  cost: 120.0
+  total: 0
+- product:
+    name: rerrrreree
+  pkg_specify: kamba
+  quantity: 90.0
+  cost: 100.0
+  total: 0
