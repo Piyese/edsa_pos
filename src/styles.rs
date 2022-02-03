@@ -54,7 +54,7 @@ pub fn get_style()->Style{
 pub fn light() -> Visuals {
     Visuals {
         dark_mode: true,
-        override_text_color: Some(Color32::BLACK),
+        override_text_color: None,
         widgets: widget_light(),
         selection: Selection::default(),   //
         hyperlink_color: Color32::from_rgb(90, 170, 255),
@@ -92,7 +92,7 @@ pub fn widget_light() -> Widgets {
         hovered: WidgetVisuals {
             bg_fill: Color32::from_rgb(222, 184, 135),
             bg_stroke: Stroke::new(1.0, Color32::from_gray(105)), // e.g. hover over window edge or button
-            fg_stroke: Stroke::new(2.0, Color32::RED),
+            fg_stroke: Stroke::new(2.0, Color32::BLACK),
             corner_radius: 10.0,
             expansion: 1.5,
         },
