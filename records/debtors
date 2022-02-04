@@ -1,0 +1,9 @@
+---
+- person:
+    name: mosprod
+    tel: "0795364736"
+  total_amount: 1840
+- person:
+    name: judexo1
+    tel: "0724401283"
+  total_amount: 634

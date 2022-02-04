@@ -1,0 +1,10 @@
+---
+- product:
+    name: unga
+  quantity: 467.5
+- product:
+    name: chicken feeds
+  quantity: 0.0
+- product:
+    name: cow salts
+  quantity: 45.0

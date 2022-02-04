@@ -1,0 +1,86 @@
+---
+- date:
+    year: 2022
+    month: 2
+    day: 3
+  product:
+    name: unga
+  raw_mat:
+    - name: maize
+      quantity: 100.0
+      price_per: ~
+- date:
+    year: 2022
+    month: 2
+    day: 3
+  product:
+    name: unga
+  raw_mat:
+    - name: maize
+      quantity: 100.0
+      price_per: ~
+- date:
+    year: 2022
+    month: 2
+    day: 3
+  product:
+    name: unga
+  raw_mat:
+    - name: maize
+      quantity: 200.0
+      price_per: ~
+- date:
+    year: 2022
+    month: 2
+    day: 3
+  product:
+    name: unga
+  raw_mat:
+    - name: maize
+      quantity: 100.0
+      price_per: ~
+- date:
+    year: 2022
+    month: 2
+    day: 4
+  product:
+    name: unga
+  raw_mat:
+    - name: maize
+      quantity: 350.0
+      price_per: ~
+- date:
+    year: 2022
+    month: 2
+    day: 4
+  product:
+    name: unga
+  raw_mat:
+    - name: soya
+      quantity: 40.0
+      price_per: ~
+    - name: maize
+      quantity: 400.0
+      price_per: ~
+    - name: maize germ
+      quantity: 4.0
+      price_per: ~
+- date:
+    year: 2022
+    month: 2
+    day: 4
+  product:
+    name: cow salts
+  raw_mat:
+    - name: beans
+      quantity: 3.0
+      price_per: ~
+    - name: soya
+      quantity: 70.0
+      price_per: ~
+    - name: maize
+      quantity: 70.0
+      price_per: ~
+    - name: maize germ
+      quantity: 70.0
+      price_per: ~

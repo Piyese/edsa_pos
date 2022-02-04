@@ -1,6 +1,5 @@
-#![allow(unused_variables,unused_imports,dead_code)]
 
-use std::{path::Path, fs::{OpenOptions, self}, io::Write};
+use std::{path::Path, fs::{self}, io::Write};
 
 use eframe::{epi::App, egui::{self, CtxRef, TopBottomPanel, Layout, Button, RichText, Separator, Label, Color32, Sense, FontDefinitions, TextStyle, FontFamily, SidePanel, panel::Side, CentralPanel, Ui, ScrollArea, Window, Align, Direction}};
 use edsa_pos::{pipeline::{
@@ -13,7 +12,6 @@ use crate::styles::top_panel_frame;
 
 
 /*********Setting Up***********/
-pub struct DailyRecords;
 #[derive(Clone)]
 pub struct TempVecs {
     rm: Vec<RawMaterial>,
@@ -25,6 +23,7 @@ pub struct TempVecs {
     actual_pkg_list: Vec<PackagedProd>,
     dy: Vec<Vec<DailyYield>>,
     prod: Vec<Product>,
+    production: Vec<Production>,
     prod_actual: Vec<Product>,
     debt: Vec<Debtor>,
     credit: Vec<Creditor>,
@@ -46,7 +45,14 @@ impl Default for TempVecs {
             // dbg!(&list);
             let _ = &dy.push(list);
         }
-
+        let mut in_trans = fetch_logs::<TransactionIn>(PathOption::TransIn).unwrap();
+        in_trans.reverse();
+        
+        let mut out_trans = fetch_logs::<OutTransaction>(PathOption::TransOut).unwrap();
+        out_trans.reverse();
+        
+        let mut production = fetch_logs::<Production>(PathOption::Production).unwrap();
+        production.reverse();
 
         let pip_actual: Vec<Person> = Vec::new();
         Self { 
@@ -59,14 +65,15 @@ impl Default for TempVecs {
             actual_pkg_list: Default::default(),
             dy,
             prod: Default::default(),
+            production,
             prod_actual: Default::default(),
             index: 0,
             fp_index: 0,
             pkg_index: 0,
             debt: Default::default(),
             credit: Default::default(),
-            in_trans: Default::default(),
-            out_trans: Default::default(),
+            in_trans,
+            out_trans,
         }
     }
 }
@@ -299,18 +306,18 @@ impl State {
                     }   
                     ui.add(Separator::default());
 
-                    let pips = ui.add(Button::new(RichText::new("Clientele")
+                    let pips = ui.add(Button::new(RichText::new("Logs")
                       .strong().monospace().heading() ));
                     if pips.clicked(){
-                        println!("RainMen");
+                        println!("Logs");
                     }
                     ui.add(Separator::default());
                 });
-                ui.with_layout(Layout::right_to_left(),|ui|{
-                    ui.add_space(10.);
-                    let theme_btn=ui.add(Button::new(RichText::new("🔆"))) ;
-                    if theme_btn.clicked() {}
-                });
+                // ui.with_layout(Layout::right_to_left(),|ui|{
+                //     ui.add_space(10.);
+                //     let theme_btn=ui.add(Button::new(RichText::new("🔆"))) ;
+                //     if theme_btn.clicked() {}
+                // });
             });
             ui.add_space(5.);
         });
@@ -322,6 +329,7 @@ impl State {
             col[2].visuals_mut().override_text_color = Some(Color32::from_rgb(0, 164, 188));
             col[0].visuals_mut().override_text_color = Some(Color32::from_rgb(0, 164, 188));
             
+            col[1].set_style(crate::styles::top_panel_style());
 
             col[1].label(RichText::new("Buy Window"));
             col[1].separator();
@@ -374,7 +382,7 @@ impl State {
                         let qty = format!("quantity: {}kg",item.quantity);
                         ui.label(RichText::new(&qty));
                         if let Some(price) = item.price_per{
-                            let price = format!("price: Ksh.{}",item.price_per.unwrap());
+                            let price = format!("price: Ksh.{}",price);
                             ui.separator();
                             ui.label(RichText::new(&price));
                         }
@@ -387,11 +395,13 @@ impl State {
                     self.editor.o = false;
                 }
             });
-            let total_cost: f32 = self.tvecs.actual_item_list.iter()
-                .map(|item| item.quantity * item.price_per.unwrap()).sum();
-            let tc = format!("total cost: {}",total_cost);
-            col[1].add_space(15.);
-            col[1].label(RichText::new(tc.to_string()));
+            if self.tvecs.actual_item_list.len() > 0 { // ***************************************
+                let total_cost: f32 = self.tvecs.actual_item_list.iter()
+                    .map(|item| item.quantity * item.price_per.unwrap()).sum();
+                let tc = format!("total cost: {}",total_cost);
+                col[1].add_space(15.);
+                col[1].label(RichText::new(tc.to_string()));
+            }
 
             col[1].horizontal(|ui| {
                 ui.label(RichText::new("Settle Bill: "));
@@ -419,38 +429,43 @@ impl State {
                         self.tvecs.pip = Vec::new();
                         self.tvecs.pip_actual = Vec::new();
                         self.editor.j = String::default();
+                        //re order material list
+                        self.apk.raw_mat = fetch_logs::<RawMaterial>(PathOption::RawMat).unwrap();
+                        self.apk.creditors = fetch_logs::<Creditor>(PathOption::Creditor).unwrap();
                         // transaction list
                         let mut list = self.apk.money_out.clone();
                         list.reverse();
-                        let list: Vec<OutTransaction> = list.into_iter().take(5).collect();
                         self.tvecs.out_trans = list;
                     }
-                    dbg!(tr);
+                    // dbg!(tr);
                 }
             }
             // A recent Transaction list *********************************************
             if self.tvecs.actual_item_list.len() <= 2 {
                 col[1].add_space(5.);
-                col[1].label(RichText::new("Recent Transactions"));
+                col[1].label(RichText::new("Recent Transactions").underline());
                 col[1].add_space(5.);
+
                 ScrollArea::vertical().id_source("rec_trans_out")
                 .show(&mut col[1], |ui|{
-                    for tr in self.tvecs.out_trans.iter() {
+                    for (i,tr) in self.tvecs.out_trans.iter().enumerate() {
                         ui.horizontal(|ui|{
                             ui.with_layout(Layout::left_to_right(), |ui|{
-                                ui.label(RichText::new(&tr.person.name));
+                                ui.label(RichText::new(&tr.person.name).color(Color32::DARK_GRAY));
                             });
                             ui.with_layout(Layout::right_to_left(), |ui|{
                                 ui.label(RichText::new(&tr.time).color(Color32::DARK_BLUE));
                             });
                         });
-                        ui.label(RichText::new(format!("total cost: {}",tr.total_cost)));
+                        ui.label(RichText::new(format!("total cost: {}",tr.total_cost)).color(Color32::DARK_GRAY));
                         if let Some(balance) = tr.balance {
                             ui.label(RichText::new(format!("unpaid balance: {}",balance)).color(Color32::RED));
                         }else {
                             ui.label(RichText::new(format!("unpaid balance: NONE ")).color(Color32::DARK_GREEN));
                         }
                         ui.separator();
+
+                        if i == 4 { break; }
                     }
                 });
             }
@@ -549,11 +564,13 @@ impl State {
             // add item
             if self.editor.n {
                 col[2].add_space(30.);
-                if col[2].button(RichText::new("add new")).clicked() {
-                    println!("add new");
-                    self.editor.m = true;
-                    self.editor.n = false;
-                }
+                col[2].horizontal(|ui|{
+                    ui.label(RichText::new("register a new raw material"));
+                    if ui.button(RichText::new("add new")).clicked() {
+                        self.editor.m = true;
+                        self.editor.n = false;
+                    }
+                });
 
                 col[2].separator();
                 col[2].horizontal( |ui| {
@@ -596,6 +613,17 @@ impl State {
             // add new raw material
             if self.editor.m {
                 col[2].add_space(30.);
+                col[2].horizontal(|ui|{
+                    let back =ui.add(Button::new(RichText::new("◀ back")));
+                    if back.clicked() {
+                        self.editor.b = String::from("");
+                            self.editor.g = 0.to_string();
+                            self.editor.m = false;
+                            self.editor.n = true;
+                    }
+                    ui.separator();
+                });
+
                 col[2].label(RichText::new("type name below.."));
                 col[2].add_space(7.);
                 col[2].text_edit_singleline(&mut self.editor.b);
@@ -611,6 +639,7 @@ impl State {
                             self.editor.b = String::from("");
                             self.editor.g = 0.to_string();
                             self.editor.m = false;
+                            self.editor.n = true;
                         }
                     }
                 }
@@ -757,6 +786,7 @@ impl State {
                         self.apk.money_in.push(tr);
                         // more clean up
                         self.apk.pkg_prod = fetch_logs::<PackagedProd>(PathOption::PkgProd).unwrap();
+                        self.apk.debtors = fetch_logs::<Debtor>(PathOption::Debtors).unwrap();
                         // reset the temp lists
                         self.tvecs.item_list = Vec::new();
                         self.tvecs.actual_pkg_list = Vec::new();
@@ -764,10 +794,9 @@ impl State {
                         self.tvecs.pip_actual = Vec::new();
                         self.editor.j = String::default();
                          // transaction list
-                         let mut list = self.apk.money_in.clone();
-                         list.reverse();
-                         let list: Vec<TransactionIn> = list.into_iter().take(5).collect();
-                         self.tvecs.in_trans = list;
+                        let mut list = self.apk.money_in.clone();
+                        list.reverse();
+                        self.tvecs.in_trans = list;
                     }
                 }
             }
@@ -776,7 +805,7 @@ impl State {
                 col[1].label(RichText::new("Recent Transactions"));
                 ScrollArea::vertical().id_source("rec_trans")
                 .show(&mut col[1], |ui|{
-                    for tr in self.tvecs.in_trans.iter() {
+                    for (i, tr) in self.tvecs.in_trans.iter().enumerate() {
                         ui.horizontal(|ui|{
                             ui.with_layout(Layout::left_to_right(), |ui|{
                                 ui.label(RichText::new(&tr.person.name));
@@ -792,6 +821,8 @@ impl State {
                             ui.label(RichText::new(format!("unpaid balance: NONE ")).color(Color32::DARK_GREEN));
                         }
                         ui.separator();
+
+                        if i == 4 { break; }
                     }
                 });
             }
@@ -1030,7 +1061,7 @@ impl State {
                 });
                 ui.separator();
                 // /////////////////////////////////////////////////////////////////////////////
-    
+                ui.add_space(20.);
                 // /////////////////////////////////////////////////////////////////////
                 ui.horizontal_top(|ui| {
                     ui.add_space(10.);
@@ -1058,6 +1089,7 @@ impl State {
                                 ui.label(RichText::new(fstr).color(Color32::GRAY));
                             });
                             ui.with_layout(Layout::right_to_left(), |ui|{
+                                // edit price here *********************************************************************
                                 ui.add_space(2.);
                                 if ui.button(RichText::new("Add")).clicked() {
                                     self.tvecs.pkg_index = i;
@@ -1219,9 +1251,7 @@ impl State {
                                 self.apk.pkg_prod[self.tvecs.pkg_index].total += packs;
                                 // log the change
                                 let path2 = Path::new("records/pkgprod");
-                                println!("we are here, path");
                                 let item_log2 = serde_yaml::to_vec(&self.apk.pkg_prod.to_owned()).unwrap();
-                                println!("we are here, item logging");
                                 let mut file = fs::File::create(path2).expect("cant open file");
                                 file.write_all(&item_log2).expect("cant write into..");
                                 
@@ -1245,7 +1275,7 @@ impl State {
                 a[0].separator();
                 if self.apk.product.is_empty() {
                     a[0].add_space(30.);
-                    a[0].label("seems you have no products you produce");
+                    a[0].label(RichText::new("oops!! no produc yet!!").color(Color32::RED));
                 }else{
                     ScrollArea::vertical().id_source("product scroll").max_height(210.)
                     .show(&mut a[0], |ui| {
@@ -1269,11 +1299,11 @@ impl State {
 
                     if self.apk.production.is_empty() {
                         a[1].add_space(30.);
-                        a[1].label("No production detected here.");
+                        a[1].label(RichText::new("oops! nothing here!!").color(Color32::RED));
                     }else{
                         ScrollArea::vertical().id_source("prodscroll").max_height(200.)
                         .show(&mut a[1], |ui|{
-                            for (i, prod) in self.apk.production.iter().enumerate() {
+                            for (i, prod) in self.tvecs.production.iter().enumerate() {
                                 let date = format!(
                                     "{}-{}-{}",
                                     &prod.date.day,
@@ -1357,9 +1387,15 @@ impl State {
                             let path = Path::new("records/production");
                             p.log(path);
                             self.editor.n = false;
+                            // house cleaning
+                            self.tvecs.prod_actual = Vec::new();
+                            self.tvecs.actual_item_list = Vec::new();
                             // re-fetch the raw_materials list and production list
                             self.apk.raw_mat = fetch_logs::<RawMaterial>(PathOption::RawMat).unwrap();
                             self.apk.production = fetch_logs::<Production>(PathOption::Production).unwrap();
+                            //the sneaky tvecs too
+                            let list = self.apk.production.to_owned();
+                            self.tvecs.production = list;
                         }
                     }
 
@@ -1379,15 +1415,11 @@ impl State {
                                     &self.apk.production[self.tvecs.index].date.month,
                                     &self.apk.production[self.tvecs.index].date.year 
                                 );
-                                ui.label(RichText::new(&date));
+                                ui.label(RichText::new(&date).color(Color32::DARK_BLUE));
                             });
                             ScrollArea::vertical().id_source("prodmatscroll").max_height(200.)
                             .show(ui, |ui|{
-                                for prod_rms in self.apk.production[self.tvecs.index].raw_mat.iter() {
-                                    // ui.horizontal(|ui|{
-                                    //     ui.with_layout(Layout::left_to_right(),|ui|{});
-                                    //     ui.with_layout(Layout::right_to_left(),|ui|{});
-                                    // });
+                                for prod_rms in self.tvecs.production[self.tvecs.index].raw_mat.iter() {
                                     ui.horizontal(|ui|{
                                         ui.with_layout(Layout::left_to_right(),|ui|{
                                             ui.add_space(10.);
@@ -1453,8 +1485,9 @@ impl State {
                     a[2].text_edit_singleline(&mut self.editor.h);
                     a[2].horizontal(|ui|{
                         ui.add_space(50.);
-                        if ui.button(RichText::new("add")).clicked() {
+                        if ui.button(RichText::new("Add")).clicked() {
                             if let Ok(qty) = self.editor.h.parse::<f32>() {
+                                // if qty > &self.tvecs.item_list
                                 let i = self.tvecs.item_list.len()-1;
                                 let rm = RawMaterial::new(self.tvecs.item_list[i].to_owned(),qty);
                                 self.tvecs.actual_item_list.push(rm);
@@ -1510,7 +1543,7 @@ impl State {
                 ScrollArea::vertical().id_source("dyscroll").max_height(200.)
                 .show(&mut b[0], |ui|{
                     for record in &self.tvecs.dy{
-                        if record.len() > 1 {
+                        if record.len() > 0 {
                             let i = record.len()-1;
                             let date = format!(
                                 "{}-{}-{}",
@@ -1660,7 +1693,7 @@ impl State {
                     self.debtors_haven(ui);
                 }else if self.conf.sale_debt_config.creditors {
                     ui.add_space(20.);
-                    // self.internal_debts(ui);
+                    self.creditors_haven(ui);
                 }
             });
         }
@@ -1697,7 +1730,7 @@ impl State {
                 col[1].add_space(20.);
                 if let Ok(index) = self.editor.g.parse::<usize>(){
                     if let Some(de) = self.apk.debtors.get(index) {
-                        col[1].label(RichText::new(&de.person.name).strong().underline());
+                        col[1].label(RichText::new(&de.person.name).underline());
                         col[1].add_space(10.);
                         col[1].horizontal(|ui|{
                             ui.label("amount to pay: ");
@@ -1760,11 +1793,110 @@ impl State {
                     ui.separator();
                 }
             });
-
-
         });
-
     }
+    
+    pub fn creditors_haven(&mut self, ui: &mut Ui) {
+        ui.columns(3,|col|{
+            // set the temp bools
+            col[0].label(RichText::new("Wanaokudai"));
+            col[0].separator();
+
+            ScrollArea::vertical().show(&mut col[0], |ui|{
+                for (i, p) in self.apk.creditors.iter().enumerate() {
+                    ui.label(&p.person.name);
+                    ui.label(RichText::new(&p.person.tel).small() );
+                    ui.label(RichText::new(format!("Ksh. {}",&p.total_amount)).color(Color32::RED) );
+                    ui.horizontal(|ui|{
+                        ui.with_layout(Layout::right_to_left(), |ui|{
+                            ui.add_space(7.);
+                            if ui.button("more ..").clicked() { 
+                                self.editor.g = i.to_string();
+                                self.editor.s = true; 
+                                self.editor.r = false 
+                            }
+                        });
+                    });
+                    
+                    ui.separator();
+                }
+            });
+
+            if self.editor.s {
+                col[1].add_space(20.);
+                if let Ok(index) = self.editor.g.parse::<usize>(){
+                    if let Some(cr) = self.apk.creditors.get(index) {
+                        col[1].label(RichText::new(&cr.person.name).underline());
+                        col[1].add_space(10.);
+                        col[1].horizontal(|ui|{
+                            ui.label("amount to pay: ");
+                            ui.add_space(10.);
+                            ui.label(RichText::new(&cr.total_amount.to_string()).color(Color32::RED));
+                        });
+                        col[1].add_space(15.);
+                        col[1].text_edit_multiline(&mut self.editor.f);
+                        col[1].add_space(10.);
+                        if col[1].button("settle ..").clicked(){
+                            // paying logic
+                            // get the transactions list
+                            if let Ok(bill) = self.editor.f.parse::<u32>() {
+                                for tr in self.apk.money_out.iter_mut() {
+                                    // we begin here ***********************************************************
+                                }
+                            }
+                        }
+
+                        col[1].add(Separator::default().spacing(10.));
+                        col[1].label("associated transactions");
+                        col[1].add(Separator::default().spacing(10.));
+                        ScrollArea::vertical().id_source("scroll2").show(&mut col[1], |ui|{
+                            for trans in &self.apk.money_out {
+                                if trans.balance.is_some() && trans.person == cr.person{
+                                    // ******* if i ever add another product.. this will break ******* //
+                                    ui.label(&trans.time);
+                                    ui.label(RichText::new(format!("total cost: {}",&trans.total_cost)));
+                                    ui.label(RichText::new(format!("unpaid balance: {}",&trans.balance.unwrap())));
+                                    ui.separator();
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+            
+            col[2].label(RichText::new("search corner"));
+            col[2].separator();
+            let search = col[2].text_edit_singleline(&mut self.editor.a);
+            
+            if search.changed() {
+                let p: Vec<_> = self.apk.creditors.to_owned().into_iter().filter(|per|{
+                    per.person.name.contains(&self.editor.a)
+                }).collect();
+                self.tvecs.credit = p;
+            }
+            ScrollArea::vertical().id_source("scroll3").show(&mut col[2], |ui|{
+                for p in self.tvecs.credit.iter() {
+                    ui.label(&p.person.name);
+                    ui.label(RichText::new(&p.person.tel).small() );
+                    ui.label(RichText::new(format!("Ksh. {}",&p.total_amount)).color(Color32::RED) );
+                    if ui.button("more ..").clicked() { 
+
+                        for (i,shylock) in self.apk.creditors.iter().enumerate() {
+                            if shylock.person == p.person {
+                                self.editor.g = i.to_string();
+                                self.editor.s = true; 
+                                self.editor.r = false;
+                                break;
+                            }
+                        }
+                    }
+                    ui.separator();
+                }
+            });
+        });
+    }
+
+    pub fn render_logs_win(&mut self, ctx: &CtxRef) {}
 
     pub fn configure_fonts(&self, ctx: &CtxRef){
         let mut font_def = FontDefinitions::default();

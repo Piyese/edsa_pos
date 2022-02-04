@@ -1,0 +1,97 @@
+---
+- time: "03-02-2022 19:28:57"
+  person:
+    name: mosprod
+    tel: "0795364736"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe
+      quantity: 2.0
+      cost: 107.0
+      total: 20
+  total_cost: 2140.0
+  bill_settled: false
+  balance: 1140.0
+- time: "04-02-2022 10:40:13"
+  person:
+    name: mosprod
+    tel: "0795364736"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe small
+      quantity: 0.5
+      cost: 70.0
+      total: 10
+  total_cost: 700.0
+  bill_settled: false
+  balance: 700.0
+- time: "04-02-2022 10:40:38"
+  person:
+    name: mosprod
+    tel: "0795364736"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe
+      quantity: 2.0
+      cost: 107.0
+      total: 10
+  total_cost: 1070.0
+  bill_settled: true
+  balance: ~
+- time: "04-02-2022 11:32:07"
+  person:
+    name: judexo1
+    tel: "0724401283"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe
+      quantity: 2.0
+      cost: 107.0
+      total: 12
+    - product:
+        name: unga
+      pkg_specify: pembe
+      quantity: 2.0
+      cost: 107.0
+      total: 50
+  total_cost: 6634.0
+  bill_settled: false
+  balance: 634.0
+- time: "04-02-2022 11:38:49"
+  person:
+    name: kris
+    tel: "096755674"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe
+      quantity: 2.0
+      cost: 107.0
+      total: 2
+    - product:
+        name: unga
+      pkg_specify: pembe small
+      quantity: 0.5
+      cost: 70.0
+      total: 5
+  total_cost: 564.0
+  bill_settled: true
+  balance: ~
+- time: "04-02-2022 12:12:55"
+  person:
+    name: mosprod
+    tel: "0795364736"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe small
+      quantity: 0.5
+      cost: 70.0
+      total: 4
+  total_cost: 280.0
+  bill_settled: true
+  balance: ~

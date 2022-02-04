@@ -1,0 +1,8 @@
+---
+- date:
+    year: 2022
+    month: 2
+    day: 4
+  product:
+    name: chicken feeds
+  quantity: 0.0

@@ -1,0 +1,13 @@
+---
+- product:
+    name: unga
+  pkg_specify: pembe
+  quantity: 2.0
+  cost: 107.0
+  total: 6
+- product:
+    name: unga
+  pkg_specify: pembe small
+  quantity: 0.5
+  cost: 70.0
+  total: 6
