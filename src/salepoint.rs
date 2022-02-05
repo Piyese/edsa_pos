@@ -1,12 +1,31 @@
 
-use std::{path::Path, fs::{self}, io::Write};
+use std::{path::Path, fs, io::Write};
 
-use eframe::{epi::App, egui::{self, CtxRef, TopBottomPanel, Layout, Button, RichText, Separator, Label, Color32, Sense, FontDefinitions, TextStyle, FontFamily, SidePanel, panel::Side, CentralPanel, Ui, ScrollArea, Window, Align, Direction}};
-use edsa_pos::{pipeline::{
-    accounts::{Debtor, Creditor, OutTransaction, TransactionIn}, 
-    inventory::{FinishedProd, RawMaterial, PackagedProd, Product, Production, DailyYield}, 
-    people::{Person, Employee}
-}, fetch_logs, PathOption, LogPartial, fetch_daily_logs};
+use eframe::{
+    epi::App, egui::{
+        self, CtxRef, TopBottomPanel, 
+        Layout, Button, RichText, 
+        Separator, Label, Color32, 
+        Sense, FontDefinitions, TextStyle, 
+        FontFamily, SidePanel, panel::Side, 
+        CentralPanel, Ui, ScrollArea, Window 
+    }
+};
+
+use edsa_pos::{
+    pipeline::{
+        accounts::{
+            Debtor, Creditor, OutTransaction, TransactionIn
+        }, 
+        inventory::{
+            FinishedProd, RawMaterial, PackagedProd, Product, Production, DailyYield
+        }, 
+        people::{
+            Person, Employee
+        }
+    }, 
+    fetch_logs, PathOption, LogPartial, fetch_daily_logs
+};
 
 use crate::styles::top_panel_frame;
 
@@ -32,6 +51,7 @@ pub struct TempVecs {
     index: usize,
     fp_index: usize,
     pkg_index: usize,
+    p_index: usize,
 
 }
 impl Default for TempVecs {
@@ -68,6 +88,7 @@ impl Default for TempVecs {
             production,
             prod_actual: Default::default(),
             index: 0,
+            p_index: 0,
             fp_index: 0,
             pkg_index: 0,
             debt: Default::default(),
@@ -129,6 +150,8 @@ pub struct Editor {
     q: bool,
     r: bool,
     s: bool,
+    z: bool,
+    y: bool,
 }
 impl Editor {
     pub fn new() -> Self {
@@ -150,8 +173,10 @@ impl Editor {
             o:false, 
             p:false, 
             q:false,
-            r: false,
-            s: false, 
+            r:false,
+            s:false, 
+            z:false,
+            y:false,
         } 
     }
 }
@@ -174,10 +199,11 @@ pub struct Config {
 pub struct WindowConfig {
     sales_win: bool,
     inventory_win: bool,
+    logs_win: bool,
 }
 impl Default for WindowConfig {
     fn default() -> Self {
-        Self { sales_win: true, inventory_win: false }
+        Self { sales_win: false, inventory_win: true, logs_win: false, }
     }
 }
 pub struct SaleConfig {
@@ -254,6 +280,9 @@ impl App for State {
         if self.conf.win_config.sales_win{
             self.render_sales_win(ctx);
         }
+        if self.conf.win_config.logs_win{
+            self.render_logs_win(ctx);
+        }
     }
 
     fn name(&self) -> &str {
@@ -282,6 +311,7 @@ impl State {
                     if inv.clicked(){
                         self.conf.win_config.inventory_win = true;
                         self.conf.win_config.sales_win = false;
+                        self.conf.win_config.logs_win = false;
                         self.conf.misc_pops.edit_pkgprod = false;
                         self.conf.misc_pops.edit_rawmat = false;
                         self.editor = Editor::default();
@@ -295,6 +325,7 @@ impl State {
                     if cash.clicked(){
                         self.conf.win_config.inventory_win = false;
                         self.conf.win_config.sales_win = true;
+                        self.conf.win_config.logs_win = false;
                         self.editor = Editor::default();
                     }
                     ui.add(Separator::default());
@@ -309,7 +340,9 @@ impl State {
                     let pips = ui.add(Button::new(RichText::new("Logs")
                       .strong().monospace().heading() ));
                     if pips.clicked(){
-                        println!("Logs");
+                        self.conf.win_config.inventory_win = false;
+                        self.conf.win_config.sales_win = false;
+                        self.conf.win_config.logs_win = true;
                     }
                     ui.add(Separator::default());
                 });
@@ -742,7 +775,7 @@ impl State {
                     });
                     ui.add_space(5.);
                     ui.horizontal(|ui|{
-                        let qty = format!("amount: {} packs",item.quantity);
+                        let qty = format!("amount: {} packs",item.total);
                         let price = format!("price: Ksh.{} each",item.cost);
                         ui.label(RichText::new(&qty));
                         ui.separator();
@@ -980,7 +1013,7 @@ impl State {
                 if ui.button(RichText::new("confirm")).clicked() {
                     if let Ok(qty) = self.editor.h.parse::<u32>() {
                         if let Some((mut pp, no)) = PackagedProd::sell_pkg(name.to_owned()) {
-                            if qty <= no {
+                            if qty <= no && qty != 0 {
                                 pp.add_packs(qty);
                                 self.tvecs.actual_pkg_list.push(pp);
                                 self.conf.misc_pops.edit_pkgprod = false;
@@ -1034,7 +1067,7 @@ impl State {
             ui.separator();
             // /////////////////////////////////////////////////////
             // normal window
-            if !self.editor.k && !self.editor.r && !self.editor.s {
+            if !self.editor.k && !self.editor.r && !self.editor.s && !self.editor.z {
                 // ////////////////////////////////////////////////////////////////////////////
                 ui.label(RichText::new("In Stock(Unpacked)").strong().underline());
                 ui.add_space(10.);
@@ -1094,6 +1127,11 @@ impl State {
                                 if ui.button(RichText::new("Add")).clicked() {
                                     self.tvecs.pkg_index = i;
                                     self.editor.s = true;
+                                }
+                                ui.add_space(2.);
+                                if ui.button(RichText::new("Edit")).clicked() {
+                                    self.tvecs.pkg_index = i;
+                                    self.editor.z = true;
                                 }
                             });
                         });
@@ -1208,7 +1246,6 @@ impl State {
                                         let list = fetch_daily_logs(path).unwrap();
                                         let _ = &dy.push(list);
                                     }
-                                    dbg!(&dy);
                                 }
                                 self.tvecs.dy = dy;
                                 // finally
@@ -1261,6 +1298,34 @@ impl State {
                     });
                 });
             }
+            if self.editor.z {
+                let string = format!("edit {}'s price",self.apk.pkg_prod[self.tvecs.pkg_index].pkg_specify);
+                ui.label(RichText::new(&string));
+                ui.add_space(5.);
+                ui.text_edit_singleline(&mut self.editor.j);
+                ui.horizontal(|ui|{
+                    ui.with_layout(Layout::right_to_left(), |ui|{
+                        ui.add_space(10.);
+                        if ui.button(RichText::new("Close")).clicked() {
+                            self.editor.z = false;
+                        }
+                        if ui.button(RichText::new("Confirm")).clicked() {
+                            // choose specific product
+                            if let Ok(price) = self.editor.j.parse::<f32>() {
+                                self.apk.pkg_prod[self.tvecs.pkg_index].cost = price;
+
+                                // log the change
+                                let path2 = Path::new("records/pkgprod");
+                                let item_log2 = serde_yaml::to_vec(&self.apk.pkg_prod.to_owned()).unwrap();
+                                let mut file = fs::File::create(path2).expect("cant open file");
+                                file.write_all(&item_log2).expect("cant write into..");
+                                
+                                self.editor.z = false;
+                            }
+                        }
+                    });
+                });
+            }
         });
 
 
@@ -1272,16 +1337,28 @@ impl State {
                 // a[1].visuals_mut().override_text_color = Some(Color32::GRAY);
                 // ////////////////////////////////////////////////////////////////
                 a[0].label(RichText::new("Products"));
+
                 a[0].separator();
                 if self.apk.product.is_empty() {
                     a[0].add_space(30.);
-                    a[0].label(RichText::new("oops!! no produc yet!!").color(Color32::RED));
+                    a[0].label(RichText::new("oops!! no product yet!!").color(Color32::RED));
                 }else{
                     ScrollArea::vertical().id_source("product scroll").max_height(210.)
                     .show(&mut a[0], |ui| {
-                        for pr in self.apk.product.iter() {
-                            ui.label(RichText::new(&pr.name));
-                            ui.add_space(5.);
+                        for (i, pr) in self.apk.product.iter().enumerate() {
+                            ui.horizontal(|ui|{
+                                ui.with_layout(Layout::left_to_right(), |ui|{
+                                    ui.add_space(10.);
+                                    ui.label(RichText::new(&pr.name));
+                                });
+                                ui.with_layout(Layout::right_to_left(), |ui|{
+                                    ui.add_space(15.);
+                                    if ui.button(RichText::new("edit")).clicked() {
+                                        self.editor.y = true;
+                                        self.tvecs.p_index = i;
+                                    }
+                                });                              
+                            });
                         }
                     });
                 }
@@ -1394,7 +1471,8 @@ impl State {
                             self.apk.raw_mat = fetch_logs::<RawMaterial>(PathOption::RawMat).unwrap();
                             self.apk.production = fetch_logs::<Production>(PathOption::Production).unwrap();
                             //the sneaky tvecs too
-                            let list = self.apk.production.to_owned();
+                            let mut list = self.apk.production.to_owned();
+                            list.reverse();
                             self.tvecs.production = list;
                         }
                     }
@@ -1407,13 +1485,13 @@ impl State {
                         // more (if)s logic
                         if self.editor.m {
                             ui.horizontal(|ui| {
-                                ui.label(RichText::new(&self.apk.production[self.tvecs.index].product.name));
+                                ui.label(RichText::new(&self.tvecs.production[self.tvecs.index].product.name));
                                 ui.separator();
                                 let date = format!(
                                     "{}-{}-{}",
-                                    &self.apk.production[self.tvecs.index].date.day,
-                                    &self.apk.production[self.tvecs.index].date.month,
-                                    &self.apk.production[self.tvecs.index].date.year 
+                                    &self.tvecs.production[self.tvecs.index].date.day,
+                                    &self.tvecs.production[self.tvecs.index].date.month,
+                                    &self.tvecs.production[self.tvecs.index].date.year 
                                 );
                                 ui.label(RichText::new(&date).color(Color32::DARK_BLUE));
                             });
@@ -1478,7 +1556,7 @@ impl State {
                         if !self.tvecs.item_list.is_empty() {
                             let i = self.tvecs.item_list.len()-1;
                             let name = &self.tvecs.item_list[i];
-                            ui.label(RichText::new(&self.tvecs.item_list[i]));
+                            ui.label(RichText::new(name));
                         }
                     });
                     a[2].add_space(5.);
@@ -1489,9 +1567,17 @@ impl State {
                             if let Ok(qty) = self.editor.h.parse::<f32>() {
                                 // if qty > &self.tvecs.item_list
                                 let i = self.tvecs.item_list.len()-1;
-                                let rm = RawMaterial::new(self.tvecs.item_list[i].to_owned(),qty);
-                                self.tvecs.actual_item_list.push(rm);
-                                self.editor.q = false
+                                let name = self.tvecs.item_list[i].to_owned();
+                                if let Some((mut rm, avail_qty)) = RawMaterial::sell_rm(name){
+                                    if qty <= avail_qty {
+                                        rm.quantity = qty;
+
+                                        self.tvecs.actual_item_list.push(rm);
+                                        self.editor.q = false
+                                    }
+                                }
+
+
                             }
                         }
                         if ui.button(RichText::new("Close")).clicked() { self.editor.q = false }
@@ -1575,7 +1661,7 @@ impl State {
                 b[1].add_space(7.);
                 if self.apk.raw_mat.is_empty() {
                     b[1].add_space(30.);
-                    b[1].label("seems you have no materials in stock right now.");
+                    b[1].label(RichText::new("oops!! No Raw Materials in stock.").color(Color32::RED));
                 }else{
                     ScrollArea::vertical().id_source("rawmatcsroll")
                     .show(&mut b[1], |ui| {
@@ -1680,10 +1766,12 @@ impl State {
                     ui.separator();
 
                     if lb.clicked() {
+                        self.tvecs.index = 0;
                         self.conf.sale_debt_config.debtors = true;
                         self.conf.sale_debt_config.creditors = false;
                     }
                     if ls.clicked() {
+                        self.tvecs.index = 0;
                         self.conf.sale_debt_config.creditors = true;
                         self.conf.sale_debt_config.debtors = false;
                     }
@@ -1728,8 +1816,13 @@ impl State {
 
             if self.editor.s {
                 col[1].add_space(20.);
+
+                let mut success_validate = false;
+
                 if let Ok(index) = self.editor.g.parse::<usize>(){
-                    if let Some(de) = self.apk.debtors.get(index) {
+                    if self.apk.debtors.get(index).is_some() {
+                        let mut de =  &mut self.apk.debtors[index];
+    
                         col[1].label(RichText::new(&de.person.name).underline());
                         col[1].add_space(10.);
                         col[1].horizontal(|ui|{
@@ -1741,10 +1834,12 @@ impl State {
                         col[1].text_edit_multiline(&mut self.editor.f);
                         col[1].add_space(10.);
                         if col[1].button("settle ..").clicked(){
-                            // paying logic
-                            // update transactions list
+                            if let Ok(bill) = self.editor.f.parse::<u32>() {
+                                de.settle_debt(bill, &mut self.apk.money_in); 
+                                success_validate = true;
+                            }
                         }
-
+    
                         col[1].add(Separator::default().spacing(10.));
                         col[1].label("associated transactions");
                         col[1].add(Separator::default().spacing(10.));
@@ -1760,6 +1855,16 @@ impl State {
                                 }
                             }
                         });
+                        if success_validate {
+                            // log creditors list
+                            let path_a = Path::new("records/debtors");
+                            let item_log = self.apk.debtors.to_owned().into_iter().filter(|per|per.total_amount > 0).collect::<Vec<Debtor>>();
+                            let item_log=serde_yaml::to_vec(&item_log).unwrap();
+                            let mut file=fs::File::create(path_a).expect("cant open file");
+                            file.write_all(&item_log).expect("cant write into..");
+    
+                            self.apk.debtors = fetch_logs::<Debtor>(PathOption::Debtors).unwrap();
+                        }
                     }
                 }
             }
@@ -1824,8 +1929,15 @@ impl State {
 
             if self.editor.s {
                 col[1].add_space(20.);
+
+                let mut success_validate = false;
+
                 if let Ok(index) = self.editor.g.parse::<usize>(){
-                    if let Some(cr) = self.apk.creditors.get(index) {
+
+                    if self.apk.creditors.get(index).is_some() {
+
+                        let mut cr =  &mut self.apk.creditors[index];
+    
                         col[1].label(RichText::new(&cr.person.name).underline());
                         col[1].add_space(10.);
                         col[1].horizontal(|ui|{
@@ -1836,23 +1948,20 @@ impl State {
                         col[1].add_space(15.);
                         col[1].text_edit_multiline(&mut self.editor.f);
                         col[1].add_space(10.);
-                        if col[1].button("settle ..").clicked(){
-                            // paying logic
-                            // get the transactions list
+                        if col[1].button("settle here ..").clicked(){
                             if let Ok(bill) = self.editor.f.parse::<u32>() {
-                                for tr in self.apk.money_out.iter_mut() {
-                                    // we begin here ***********************************************************
-                                }
+                                cr.settle_debt(bill, &mut self.apk.money_out); 
+                                success_validate = true;
                             }
                         }
-
+                        
+    
                         col[1].add(Separator::default().spacing(10.));
                         col[1].label("associated transactions");
                         col[1].add(Separator::default().spacing(10.));
                         ScrollArea::vertical().id_source("scroll2").show(&mut col[1], |ui|{
                             for trans in &self.apk.money_out {
                                 if trans.balance.is_some() && trans.person == cr.person{
-                                    // ******* if i ever add another product.. this will break ******* //
                                     ui.label(&trans.time);
                                     ui.label(RichText::new(format!("total cost: {}",&trans.total_cost)));
                                     ui.label(RichText::new(format!("unpaid balance: {}",&trans.balance.unwrap())));
@@ -1860,6 +1969,17 @@ impl State {
                                 }
                             }
                         });
+    
+                        if success_validate {
+                            // log creditors list
+                            let path_a = Path::new("records/creditors");
+                            let item_log=self.apk.creditors.to_owned().into_iter().filter(|per| per.total_amount > 0 ).collect::<Vec<Creditor>>();
+                            let item_log=serde_yaml::to_vec(&item_log).unwrap();
+                            let mut file=fs::File::create(path_a).expect("cant create file");
+                            file.write_all(&item_log).expect("cant write into..");
+    
+                            self.apk.creditors = fetch_logs::<Creditor>(PathOption::Creditor).unwrap();
+                        }
                     }
                 }
             }
@@ -1896,7 +2016,129 @@ impl State {
         });
     }
 
-    pub fn render_logs_win(&mut self, ctx: &CtxRef) {}
+    pub fn render_logs_win(&mut self, ctx: &CtxRef) {
+        let frame = top_panel_frame();
+        CentralPanel::default().frame(frame)
+        .show(ctx, |ui|{
+            ui.set_style(crate::styles::top_panel_style());
+
+            ui.columns(3, |col| {
+                col[0].label(RichText::new("all 'Sells' ").underline());
+                col[0].add_space(8.);
+                ScrollArea::vertical().id_source("l_scroll")
+                .show(&mut col[0], |ui|{
+                    for tr in self.tvecs.in_trans.iter() {
+                        ui.horizontal(|ui|{
+                            ui.with_layout(Layout::left_to_right(), |ui|{
+                                ui.label(RichText::new(&tr.person.name));
+                            });
+                            ui.with_layout(Layout::right_to_left(), |ui|{
+                                ui.label(RichText::new(&tr.time).color(Color32::DARK_BLUE));
+                            });
+                        });
+                        ui.add_space(5.);
+                        ui.label(RichText::new("items"));
+                        ui.add_space(5.);
+                        
+                        for item in tr.items.iter() {
+                            ui.horizontal(|ui|{
+                                ui.with_layout(Layout::left_to_right(), |ui|{
+                                    ui.add_space(5.);
+                                    ui.label(RichText::new(&item.pkg_specify).color(Color32::DARK_GRAY));
+                                    let fstr = format!("at Ksh.{}",item.cost );
+                                    ui.label(RichText::new(&fstr).color(Color32::DARK_GRAY))
+                                });
+                                ui.with_layout(Layout::right_to_left(), |ui|{
+                                    ui.add_space(5.);
+                                    let fstr = format!("{} packs",item.total);
+                                    ui.label(RichText::new(&fstr).color(Color32::DARK_GRAY));
+                                });
+                            });
+                        }
+                    
+                        ui.add_space(5.);
+                        ui.horizontal(|ui|{
+                            ui.with_layout(Layout::left_to_right(), |ui|{
+                                ui.add_space(5.);
+                                let fstr = format!("Total Amount: {}",&tr.total_cost);
+                                ui.label(RichText::new(&fstr));
+                            });
+                            ui.with_layout(Layout::right_to_left(), |ui|{
+                                ui.add_space(5.);
+                                if let Some(bal) = tr.balance {
+                                    let fstr = format!("Balance: .Ksh{}",bal);
+                                    ui.label(RichText::new(&fstr));
+                                }else {
+                                    let fstr = format!("Balance: None");
+                                    ui.label(RichText::new(&fstr));
+                                }
+                            });
+                        });
+
+                    ui.separator();                        
+                    }
+    
+                });
+
+                col[2].label(RichText::new("all 'Buys' ").underline());
+                col[2].add_space(8.);
+                ScrollArea::vertical().id_source("r_scroll")
+                .show(&mut col[2], |ui|{
+                    for tr in self.tvecs.out_trans.iter() {
+                        ui.horizontal(|ui|{
+                            ui.with_layout(Layout::left_to_right(), |ui|{
+                                ui.label(RichText::new(&tr.person.name));
+                            });
+                            ui.with_layout(Layout::right_to_left(), |ui|{
+                                ui.label(RichText::new(&tr.time).color(Color32::DARK_BLUE));
+                            });
+                        });
+                        ui.add_space(5.);
+                        ui.label(RichText::new("items"));
+                        ui.add_space(5.);
+                        
+                        for item in tr.items.iter() {
+                            ui.horizontal(|ui|{
+                                ui.with_layout(Layout::left_to_right(), |ui|{
+                                    ui.add_space(5.);
+                                    ui.label(RichText::new(&item.name).color(Color32::DARK_GRAY));
+                                    let fstr = format!("->{} Kg(s)",item.quantity );
+                                    ui.label(RichText::new(&fstr).color(Color32::DARK_GRAY))
+                                });
+                                ui.with_layout(Layout::right_to_left(), |ui|{
+                                    ui.add_space(5.);
+                                    let fstr = format!("cost: Ksh.{}",item.quantity*item.price_per.unwrap());
+                                    ui.label(RichText::new(&fstr).color(Color32::DARK_GRAY));
+                                });
+                            });
+                        }
+                    
+                        ui.add_space(5.);
+                        ui.horizontal(|ui|{
+                            ui.with_layout(Layout::left_to_right(), |ui|{
+                                ui.add_space(5.);
+                                let fstr = format!("Total Amount: {}",&tr.total_cost);
+                                ui.label(RichText::new(&fstr));
+                            });
+                            ui.with_layout(Layout::right_to_left(), |ui|{
+                                ui.add_space(5.);
+                                if let Some(bal) = tr.balance {
+                                    let fstr = format!("Balance: .Ksh{}",bal);
+                                    ui.label(RichText::new(&fstr));
+                                }else {
+                                    let fstr = format!("Balance: None");
+                                    ui.label(RichText::new(&fstr));
+                                }
+                            });
+                        });
+
+                    ui.separator();                        
+                    }
+    
+                });
+            });
+        });
+    }
 
     pub fn configure_fonts(&self, ctx: &CtxRef){
         let mut font_def = FontDefinitions::default();
@@ -1918,5 +2160,5 @@ impl State {
 
         ctx.set_fonts(font_def);
     }
-
 }
+

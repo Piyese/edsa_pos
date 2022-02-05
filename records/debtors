@@ -6,4 +6,8 @@
 - person:
     name: judexo1
     tel: "0724401283"
-  total_amount: 634
+  total_amount: 0
+- person:
+    name: kris
+    tel: "096755674"
+  total_amount: 57

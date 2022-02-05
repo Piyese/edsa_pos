@@ -59,8 +59,8 @@
       cost: 107.0
       total: 50
   total_cost: 6634.0
-  bill_settled: false
-  balance: 634.0
+  bill_settled: true
+  balance: ~
 - time: "04-02-2022 11:38:49"
   person:
     name: kris
@@ -95,3 +95,31 @@
   total_cost: 280.0
   bill_settled: true
   balance: ~
+- time: "04-02-2022 16:59:34"
+  person:
+    name: kris
+    tel: "096755674"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe
+      quantity: 2.0
+      cost: 107.0
+      total: 1
+  total_cost: 107.0
+  bill_settled: false
+  balance: 7.0
+- time: "04-02-2022 18:05:57"
+  person:
+    name: kris
+    tel: "096755674"
+  items:
+    - product:
+        name: unga
+      pkg_specify: pembe small
+      quantity: 0.5
+      cost: 70.0
+      total: 5
+  total_cost: 350.0
+  bill_settled: false
+  balance: 50.0
