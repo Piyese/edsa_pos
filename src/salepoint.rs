@@ -21,7 +21,7 @@ use edsa_pos::{
             FinishedProd, RawMaterial, PackagedProd, Product, Production, DailyYield
         }, 
         people::{
-            Person, Employee
+            Person, Employee, Sex
         }
     }, 
     fetch_logs, PathOption, LogPartial, fetch_daily_logs
@@ -48,10 +48,13 @@ pub struct TempVecs {
     credit: Vec<Creditor>,
     in_trans: Vec<TransactionIn>,
     out_trans: Vec<OutTransaction>,
+    // and temp indices.. haha!!
     index: usize,
     fp_index: usize,
     pkg_index: usize,
     p_index: usize,
+    // temp enum..
+    sex: Sex,
 
 }
 impl Default for TempVecs {
@@ -95,6 +98,7 @@ impl Default for TempVecs {
             credit: Default::default(),
             in_trans,
             out_trans,
+            sex: Sex::Male,
         }
     }
 }
@@ -200,10 +204,11 @@ pub struct WindowConfig {
     sales_win: bool,
     inventory_win: bool,
     logs_win: bool,
+    staff_win: bool,
 }
 impl Default for WindowConfig {
     fn default() -> Self {
-        Self { sales_win: false, inventory_win: true, logs_win: false, }
+        Self { sales_win: false, inventory_win: true, logs_win: false, staff_win: false }
     }
 }
 pub struct SaleConfig {
@@ -267,21 +272,25 @@ impl App for State {
     }
 
     fn update(&mut self, ctx: &eframe::egui::CtxRef, _frame: &eframe::epi::Frame) {
+        
         self.render_top_panel(ctx);
         if self.conf.misc_pops.edit_rawmat {
             self.edit_rawmat(ctx);
         }
-        if self.conf.misc_pops.edit_pkgprod{
+        if self.conf.misc_pops.edit_pkgprod {
             self.edit_pkgprod(ctx);
         }
-        if self.conf.win_config.inventory_win{
+        if self.conf.win_config.inventory_win {
             self.render_inventory_win(ctx);
         }
-        if self.conf.win_config.sales_win{
+        if self.conf.win_config.sales_win {
             self.render_sales_win(ctx);
         }
-        if self.conf.win_config.logs_win{
+        if self.conf.win_config.logs_win {
             self.render_logs_win(ctx);
+        }
+        if self.conf.win_config.staff_win {
+            self.render_staff_win(ctx);
         }
     }
 
@@ -312,8 +321,11 @@ impl State {
                         self.conf.win_config.inventory_win = true;
                         self.conf.win_config.sales_win = false;
                         self.conf.win_config.logs_win = false;
+                        self.conf.win_config.staff_win = false;
+
                         self.conf.misc_pops.edit_pkgprod = false;
                         self.conf.misc_pops.edit_rawmat = false;
+
                         self.editor = Editor::default();
                     }
                     ui.add(Separator::default());
@@ -326,22 +338,32 @@ impl State {
                         self.conf.win_config.inventory_win = false;
                         self.conf.win_config.sales_win = true;
                         self.conf.win_config.logs_win = false;
+                        self.conf.win_config.staff_win = false;
+
                         self.editor = Editor::default();
                     }
                     ui.add(Separator::default());
 
                     let staff = ui.add(Button::new(RichText::new("Staff")
-                      .strong().monospace().heading() ));
+                      .strong().monospace().heading().color(
+                        if self.conf.win_config.staff_win {Color32::from_rgb(91,40,195)} else {Color32::BLACK}
+                    ) ));
                     if staff.clicked(){
-                        println!("Bees");
+                        self.conf.win_config.inventory_win = false;
+                        self.conf.win_config.sales_win = false;
+                        self.conf.win_config.logs_win = false;
+                        self.conf.win_config.staff_win = true;
                     }   
                     ui.add(Separator::default());
 
                     let pips = ui.add(Button::new(RichText::new("Logs")
-                      .strong().monospace().heading() ));
+                      .strong().monospace().heading().color(
+                        if self.conf.win_config.logs_win {Color32::from_rgb(91,40,195)} else {Color32::BLACK}
+                    ) ));
                     if pips.clicked(){
                         self.conf.win_config.inventory_win = false;
                         self.conf.win_config.sales_win = false;
+                        self.conf.win_config.staff_win = false;
                         self.conf.win_config.logs_win = true;
                     }
                     ui.add(Separator::default());
@@ -475,16 +497,18 @@ impl State {
             }
             // A recent Transaction list *********************************************
             if self.tvecs.actual_item_list.len() <= 2 {
-                col[1].add_space(5.);
-                col[1].label(RichText::new("Recent Transactions").underline());
-                col[1].add_space(5.);
+                col[1].add_space(7.);
+                col[1].vertical_centered(|ui|{
+                    ui.label(RichText::new("Recent Transactions").underline());
+                });
+                col[1].add_space(7.);
 
                 ScrollArea::vertical().id_source("rec_trans_out")
                 .show(&mut col[1], |ui|{
                     for (i,tr) in self.tvecs.out_trans.iter().enumerate() {
                         ui.horizontal(|ui|{
                             ui.with_layout(Layout::left_to_right(), |ui|{
-                                ui.label(RichText::new(&tr.person.name).color(Color32::DARK_GRAY));
+                                ui.label(RichText::new(&tr.person.name));
                             });
                             ui.with_layout(Layout::right_to_left(), |ui|{
                                 ui.label(RichText::new(&tr.time).color(Color32::DARK_BLUE));
@@ -834,8 +858,11 @@ impl State {
                 }
             }
             if self.tvecs.actual_pkg_list.len() <= 2 {
-                col[1].add_space(5.);
-                col[1].label(RichText::new("Recent Transactions"));
+                col[1].add_space(7.);
+                col[1].vertical_centered(|ui|{
+                    ui.label(RichText::new("Recent Transactions").underline());
+                }); 
+                col[1].add_space(7.);
                 ScrollArea::vertical().id_source("rec_trans")
                 .show(&mut col[1], |ui|{
                     for (i, tr) in self.tvecs.in_trans.iter().enumerate() {
@@ -847,7 +874,7 @@ impl State {
                                 ui.label(RichText::new(&tr.time).color(Color32::DARK_BLUE));
                             });
                         });
-                        ui.label(RichText::new(format!("total cost: {}",tr.total_cost)));
+                        ui.label(RichText::new(format!("total cost: {}",tr.total_cost)).color(Color32::DARK_GRAY));
                         if let Some(balance) = tr.balance {
                             ui.label(RichText::new(format!("unpaid balance: {}",balance)).color(Color32::RED));
                         }else {
@@ -1351,13 +1378,6 @@ impl State {
                                     ui.add_space(10.);
                                     ui.label(RichText::new(&pr.name));
                                 });
-                                ui.with_layout(Layout::right_to_left(), |ui|{
-                                    ui.add_space(15.);
-                                    if ui.button(RichText::new("edit")).clicked() {
-                                        self.editor.y = true;
-                                        self.tvecs.p_index = i;
-                                    }
-                                });                              
                             });
                         }
                     });
@@ -1756,10 +1776,12 @@ impl State {
 
         }else if self.conf.sale_config.debt_win {
             CentralPanel::default().frame(frame).show(ctx, |ui|{
+                ui.set_style(crate::styles::top_panel_style());
+
                 egui::menu::bar(ui, |ui|{
           
-                    let rt = RichText::new("External Debts").color(if self.conf.sale_debt_config.debtors{ Color32::from_rgb(91,40,195) } else { Color32::GRAY });
-                    let rst = RichText::new("Internal Debts").color(if self.conf.sale_debt_config.creditors{ Color32::from_rgb(91,40,195) } else { Color32::GRAY });
+                    let rt = RichText::new("Debtors").color(if self.conf.sale_debt_config.debtors{ Color32::from_rgb(91,40,195) } else { Color32::GRAY });
+                    let rst = RichText::new("Creditors").color(if self.conf.sale_debt_config.creditors{ Color32::from_rgb(91,40,195) } else { Color32::GRAY });
                     let lb = ui.button(rt.heading());
                     ui.separator();
                     let ls = ui.button(rst.heading()); 
@@ -2023,7 +2045,9 @@ impl State {
             ui.set_style(crate::styles::top_panel_style());
 
             ui.columns(3, |col| {
-                col[0].label(RichText::new("all 'Sells' ").underline());
+                col[0].vertical_centered(|ui|{
+                    ui.label(RichText::new("all 'Sells' ").underline());
+                }); 
                 col[0].add_space(8.);
                 ScrollArea::vertical().id_source("l_scroll")
                 .show(&mut col[0], |ui|{
@@ -2060,16 +2084,16 @@ impl State {
                         ui.horizontal(|ui|{
                             ui.with_layout(Layout::left_to_right(), |ui|{
                                 ui.add_space(5.);
-                                let fstr = format!("Total Amount: {}",&tr.total_cost);
+                                let fstr = format!("Total Amt: {}",&tr.total_cost);
                                 ui.label(RichText::new(&fstr));
                             });
                             ui.with_layout(Layout::right_to_left(), |ui|{
                                 ui.add_space(5.);
                                 if let Some(bal) = tr.balance {
-                                    let fstr = format!("Balance: .Ksh{}",bal);
+                                    let fstr = format!("Bal: .Ksh{}",bal);
                                     ui.label(RichText::new(&fstr));
                                 }else {
-                                    let fstr = format!("Balance: None");
+                                    let fstr = format!("Bal: None");
                                     ui.label(RichText::new(&fstr));
                                 }
                             });
@@ -2079,8 +2103,9 @@ impl State {
                     }
     
                 });
-
-                col[2].label(RichText::new("all 'Buys' ").underline());
+                col[2].vertical_centered(|ui|{
+                    ui.label(RichText::new("all 'Buys' ").underline());
+                });
                 col[2].add_space(8.);
                 ScrollArea::vertical().id_source("r_scroll")
                 .show(&mut col[2], |ui|{
@@ -2117,16 +2142,16 @@ impl State {
                         ui.horizontal(|ui|{
                             ui.with_layout(Layout::left_to_right(), |ui|{
                                 ui.add_space(5.);
-                                let fstr = format!("Total Amount: {}",&tr.total_cost);
+                                let fstr = format!("Total Amt: {}",&tr.total_cost);
                                 ui.label(RichText::new(&fstr));
                             });
                             ui.with_layout(Layout::right_to_left(), |ui|{
                                 ui.add_space(5.);
                                 if let Some(bal) = tr.balance {
-                                    let fstr = format!("Balance: .Ksh{}",bal);
+                                    let fstr = format!("Bal: .Ksh{}",bal);
                                     ui.label(RichText::new(&fstr));
                                 }else {
-                                    let fstr = format!("Balance: None");
+                                    let fstr = format!("Bal: None");
                                     ui.label(RichText::new(&fstr));
                                 }
                             });
@@ -2135,6 +2160,116 @@ impl State {
                     ui.separator();                        
                     }
     
+                });
+            });
+        });
+    }
+
+    pub fn render_staff_win(&mut self, ctx: &CtxRef) {
+        let frame = top_panel_frame();
+        CentralPanel::default().frame(frame).show(ctx, |ui|{
+            ui.set_style(crate::styles::top_panel_style());
+
+            ui.columns(2,|col|{
+                col[0].vertical_centered(|ui|{
+                    ui.add_space(10.);
+                    ui.label(RichText::new("Staff List").underline());
+                    ui.add_space(10.);
+                    ScrollArea::vertical().id_source("staff_scroll").show(ui, |ui|{
+                        for (i, per) in self.apk.staff.iter().enumerate() {
+                            ui.horizontal(|ui|{
+                                ui.with_layout(Layout::left_to_right(), |ui|{
+                                    ui.add_space(15.);
+                                    ui.label(RichText::new(&per.name));
+                                });
+                                ui.with_layout(Layout::right_to_left(), |ui|{
+                                    ui.add_space(15.);
+                                    let x = match per.active {
+                                        true => RichText::new("ACTIVE").color(Color32::GREEN),
+                                        false => RichText::new("INACTIVE").color(Color32::LIGHT_RED),
+                                    };
+                                    ui.label(x);
+                                    ui.separator();
+                                    let y = match per.sex {
+                                        edsa_pos::pipeline::people::Sex::Male => RichText::new("Male"),
+                                        edsa_pos::pipeline::people::Sex::Female => RichText::new("Female"),
+                                    };
+                                    ui.label(y);
+                                });
+                            });
+                            ui.horizontal(|ui|{
+                                ui.with_layout(Layout::left_to_right(), |ui|{
+                                    ui.add_space(15.);
+                                    ui.label(RichText::new(format!("☎ {}",&per.tel)).color(Color32::DARK_GRAY));
+                                });
+                            });
+                            ui.add_space(8.);
+                            ui.add(Separator::default());
+                        }
+                    });
+                });
+
+                col[1].indent("reg", |ui|{
+                    ui.add_space(15.);
+                    ui.vertical_centered(|ui|{
+                        ui.label(RichText::new("Registration").underline());
+                    });
+                    ui.horizontal(|ui|{
+                        ui.add_space(20.);
+                        ui.label(RichText::new("Name"));
+                        ui.add_space(20.);
+                        let _text_input = ui.text_edit_singleline( &mut self.editor.c );
+                    }); 
+                    ui.add_space(20.);
+        
+                    ui.horizontal(|ui|{
+                        ui.add_space(20.);
+                        ui.label(RichText::new("Tel No."));
+                        // ui.add_space(20.);
+                        let _text_input = ui.text_edit_singleline( &mut self.editor.b );
+                    }); 
+                    ui.add_space(20.);
+        
+                    ui.horizontal(|ui|{
+                        ui.add_space(20.);
+                        ui.checkbox(&mut self.editor.y, RichText::new("active").monospace());
+                    });
+                    ui.add_space(20.);
+        
+                    ui.horizontal(|ui|{
+                        ui.add_space(20.);
+                        ui.label("Sex: ");
+                        ui.selectable_value(&mut self.tvecs.sex , Sex::Male, RichText::new("Male") );
+                        ui.separator();
+                        ui.selectable_value(&mut self.tvecs.sex, Sex::Female, RichText::new("Female"));
+                    });
+                    ui.add_space(20.);
+        
+                    ui.horizontal(|ui|{
+                        ui.with_layout(Layout::right_to_left(), |ui|{
+                            
+                            ui.add_space(20.);
+                            
+                            if ui.button(RichText::new("add").text_style(TextStyle::Body)).clicked(){
+                                if self.editor.c.len()>1 && self.editor.b.len()>1 {
+                                    let name = self.editor.c.clone();
+                                    let tel = self.editor.b.clone();
+                                    let active = self.editor.y;
+                                    let sex = self.tvecs.sex;
+            
+                                    let p = Employee::new(name, sex, active, tel);
+            
+                                    self.apk.staff.push(p.clone());
+                                    let path = Path::new("records/employees");
+                                    p.log(path);
+                                    self.editor.c = String::default();
+                                    self.editor.b = String::default();
+                                } 
+                            }
+                        })
+                    });
+                    ui.add(Separator::default());
+        
                 });
             });
         });

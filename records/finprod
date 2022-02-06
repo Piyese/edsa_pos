@@ -4,7 +4,10 @@
   quantity: 512.5
 - product:
     name: chicken feeds
-  quantity: 0.0
+  quantity: 120.0
 - product:
     name: cow salts
   quantity: 473.0
+- product:
+    name: pjoio
+  quantity: 0.0

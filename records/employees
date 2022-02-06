@@ -1,0 +1,13 @@
+---
+- name: "qweadd"
+  sex: Female
+  active: true
+  tel: "211313"
+- name: asali
+  sex: Male
+  active: true
+  tel: "0983546"
+- name: were
+  sex: Male
+  active: false
+  tel: "121133"
