@@ -1,13 +1,9 @@
 ---
-- name: "qweadd"
-  sex: Female
-  active: true
-  tel: "211313"
-- name: asali
-  sex: Male
-  active: true
-  tel: "0983546"
-- name: were
+- name: cheroo
   sex: Male
   active: false
-  tel: "121133"
+  tel: "0183293738"
+- name: munga
+  sex: Female
+  active: true
+  tel: "0926336332"

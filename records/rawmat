@@ -1,13 +1,7 @@
 ---
 - name: maize
-  quantity: 0.100000024
+  quantity: 800.0
   price_per: ~
-- name: maize germ
-  quantity: 187.0
-  price_per: ~
-- name: soya
-  quantity: 100.0
-  price_per: ~
-- name: beans
-  quantity: 875.0
+- name: oil
+  quantity: 400.0
   price_per: ~

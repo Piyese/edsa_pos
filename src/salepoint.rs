@@ -156,6 +156,7 @@ pub struct Editor {
     s: bool,
     z: bool,
     y: bool,
+    x: bool,
 }
 impl Editor {
     pub fn new() -> Self {
@@ -181,6 +182,7 @@ impl Editor {
             s:false, 
             z:false,
             y:false,
+            x:false,
         } 
     }
 }
@@ -1481,8 +1483,7 @@ impl State {
                             for rm in &self.tvecs.actual_item_list {
                                 p.add_rawmat(rm);
                             }
-                            let path = Path::new("records/production");
-                            p.log(path);
+                            p.finish();
                             self.editor.n = false;
                             // house cleaning
                             self.tvecs.prod_actual = Vec::new();
@@ -2103,6 +2104,7 @@ impl State {
                     }
     
                 });
+
                 col[2].vertical_centered(|ui|{
                     ui.label(RichText::new("all 'Buys' ").underline());
                 });
@@ -2202,7 +2204,15 @@ impl State {
                                     ui.add_space(15.);
                                     ui.label(RichText::new(format!("☎ {}",&per.tel)).color(Color32::DARK_GRAY));
                                 });
+                                ui.with_layout(Layout::right_to_left(), |ui|{
+                                    ui.add_space(15.);
+                                    if ui.button(RichText::new("edit")).clicked() {
+                                        self.tvecs.p_index = i;
+                                        self.editor.x = true;
+                                    }
+                                });
                             });
+
                             ui.add_space(8.);
                             ui.add(Separator::default());
                         }
@@ -2214,6 +2224,7 @@ impl State {
                     ui.vertical_centered(|ui|{
                         ui.label(RichText::new("Registration").underline());
                     });
+                    ui.add_space(15.);
                     ui.horizontal(|ui|{
                         ui.add_space(20.);
                         ui.label(RichText::new("Name"));
@@ -2269,7 +2280,76 @@ impl State {
                         })
                     });
                     ui.add(Separator::default());
-        
+                    
+                    if self.editor.x {
+
+                        let mut confirm_validator = false;
+
+                        if self.apk.staff.get(self.tvecs.p_index).is_some() {
+                            let p = &mut self.apk.staff[self.tvecs.p_index];
+                            ui.add_space(15.);
+                            ui.vertical_centered(|ui|{
+                                ui.label(RichText::new("Edit").underline());
+                            });
+                            ui.add_space(15.);
+                            ui.horizontal(|ui|{
+                                ui.add_space(20.);
+                                ui.label(RichText::new("Name"));
+                                ui.add_space(20.);
+                                let _text_input = ui.text_edit_singleline( &mut p.name );
+                            }); 
+                            ui.add_space(20.);
+                
+                            ui.horizontal(|ui|{
+                                ui.add_space(20.);
+                                ui.label(RichText::new("Tel No."));
+                                // ui.add_space(20.);
+                                let _text_input = ui.text_edit_singleline( &mut p.tel );
+                            }); 
+                            ui.add_space(20.);
+                
+                            ui.horizontal(|ui|{
+                                ui.add_space(20.);
+                                ui.checkbox(&mut p.active, RichText::new("active").monospace());
+                            });
+                            ui.add_space(20.);
+                
+                            ui.horizontal(|ui|{
+                                ui.add_space(20.);
+                                ui.label("Sex: ");
+                                ui.selectable_value(&mut p.sex , Sex::Male, RichText::new("Male") );
+                                ui.separator();
+                                ui.selectable_value(&mut p.sex, Sex::Female, RichText::new("Female"));
+                            });
+                            ui.add_space(20.);
+                
+                            ui.horizontal(|ui|{
+                                ui.with_layout(Layout::right_to_left(), |ui|{
+                                    
+                                    ui.add_space(20.);
+
+                                    if ui.button(RichText::new("Discard").text_style(TextStyle::Body)).clicked(){
+                                        self.editor.x = false;
+                                    }
+                                    
+                                    if ui.button(RichText::new("Confirm").text_style(TextStyle::Body)).clicked(){
+                                        if p.name.len()>1 && p.tel.len()>1 {
+                                            confirm_validator = true;
+                                            self.editor.x = false;
+                                        }
+                                    }
+                                })
+                            });
+                        }
+                        if confirm_validator {
+                            let path = Path::new("records/employees");
+                            
+                            let ls = self.apk.staff.to_owned();
+                            let dlu8 = serde_yaml::to_vec(&ls).unwrap();
+                            let mut file=std::fs::File::create(path).unwrap();
+                            file.write_all(&dlu8).unwrap();
+                        }
+                    }
                 });
             });
         });

@@ -1,89 +1,23 @@
 ---
-- time: "03-02-2022 18:19:56"
+- time: "07-02-2022 11:16:22"
   person:
-    name: mosprod
-    tel: "0795364736"
-  items:
-    - name: maize
-      quantity: 120.0
-      price_per: 35.0
-  total_cost: 4200.0
-  bill_settled: true
-  balance: ~
-- time: "03-02-2022 18:39:21"
-  person:
-    name: mosprod
-    tel: "0795364736"
+    name: lana
+    tel: "626226"
   items:
     - name: maize
       quantity: 1000.0
-      price_per: 45.0
-  total_cost: 45000.0
+      price_per: 10.0
+  total_cost: 10000.0
   bill_settled: true
   balance: ~
-- time: "03-02-2022 19:06:41"
+- time: "07-02-2022 11:18:08"
   person:
-    name: mosprod
-    tel: "0795364736"
+    name: lana
+    tel: "626226"
   items:
-    - name: maize
+    - name: oil
       quantity: 1000.0
-      price_per: 34.0
-  total_cost: 34000.0
-  bill_settled: false
-  balance: 1000.0
-- time: "04-02-2022 11:33:47"
-  person:
-    name: judexo1
-    tel: "0724401283"
-  items:
-    - name: maize germ
-      quantity: 50.0
-      price_per: 60.0
-  total_cost: 3000.0
-  bill_settled: false
-  balance: 500.0
-- time: "04-02-2022 11:47:09"
-  person:
-    name: kris
-    tel: "096755674"
-  items:
-    - name: soya
-      quantity: 600.0
-      price_per: 35.0
-  total_cost: 21000.0
-  bill_settled: true
-  balance: ~
-- time: "05-02-2022 11:32:49"
-  person:
-    name: judexo1
-    tel: "0724401283"
-  items:
-    - name: maize germ
-      quantity: 211.0
-      price_per: 23.0
-  total_cost: 4853.0
-  bill_settled: true
-  balance: ~
-- time: "05-02-2022 11:47:01"
-  person:
-    name: ndoviu
-    tel: "91288397392"
-  items:
-    - name: beans
-      quantity: 1000.0
-      price_per: 120.0
-  total_cost: 120000.0
-  bill_settled: true
-  balance: ~
-- time: "05-02-2022 11:47:30"
-  person:
-    name: ndoviu
-    tel: "91288397392"
-  items:
-    - name: soya
-      quantity: 100.0
-      price_per: 120.0
+      price_per: 12.0
   total_cost: 12000.0
   bill_settled: false
-  balance: 421.0
+  balance: 6000.0

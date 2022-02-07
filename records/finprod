@@ -1,13 +1,7 @@
 ---
 - product:
     name: unga
-  quantity: 512.5
+  quantity: 0.0
 - product:
-    name: chicken feeds
-  quantity: 120.0
-- product:
-    name: cow salts
-  quantity: 473.0
-- product:
-    name: pjoio
+    name: oily
   quantity: 0.0
